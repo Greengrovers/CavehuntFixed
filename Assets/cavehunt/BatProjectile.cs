@@ -4,7 +4,7 @@ using UnityEngine;
 public class BatProjectile : MonoBehaviour
 {
     [SerializeField] private float damage = 1f;
-    [SerializeField] private float lifetime = 6f;
+    [SerializeField] private float lifetime = 60f;
     [SerializeField] private float targetHitRadius = 0.45f;
 
     private Transform target;

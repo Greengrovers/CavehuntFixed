@@ -3,16 +3,15 @@ using UnityEngine.SceneManagement;
 
 public static class BatEncounterBootstrap
 {
-    private const int EnemyCount = 6;
-    private const float BatScaleMultiplier = 1.6f;
-    private const float BatMaxHealth = 5f;
-    private const float BatDescendSpeed = 3.1f;
+    private const int EnemyCount = 2;
+    private const float BatScaleMultiplier = 1.1f;
+    private const float DefaultBatMaxHealth = 3f;
     private const float BatShootInterval = 1.1f;
     private const float BatBulletSpeed = 12f;
     private const float BatBulletDamage = 1f;
-    private const float FallbackCeilingHeightAbovePlayer = 5.5f;
-    private const float MinimumCeilingHeightAbovePlayer = 3.5f;
-    private const float MaximumCeilingHeightAbovePlayer = 7.5f;
+    private const float FallbackCeilingHeightAbovePlayer = 7f;
+    private const float MinimumCeilingHeightAbovePlayer = 5.5f;
+    private const float MaximumCeilingHeightAbovePlayer = 9f;
     private const float CeilingProbeStartOffset = 0.25f;
     private const float CeilingProbeDistance = 90f;
     private const float CeilingInset = 0.45f;
@@ -76,9 +75,12 @@ public static class BatEncounterBootstrap
         if (damageable == null)
         {
             damageable = bat.AddComponent<Damageable>();
+            damageable.SetMaxHealth(DefaultBatMaxHealth);
         }
-
-        damageable.SetMaxHealth(BatMaxHealth);
+        else
+        {
+            damageable.EnsureValidMaxHealth(DefaultBatMaxHealth);
+        }
 
         if (bat.GetComponentInChildren<Collider>() == null)
         {
@@ -107,9 +109,11 @@ public static class BatEncounterBootstrap
         }
         healthBar.Configure(playerTarget);
 
-        Transform bulletSpawn = EnsureBulletSpawnPoint(bat.transform);
+        Transform bulletSpawn = batEnemy.BulletSpawnPoint != null
+            ? batEnemy.BulletSpawnPoint
+            : EnsureBulletSpawnPoint(bat.transform);
         batEnemy.SetPreferredSpawnIndex(spawnOffset);
-        batEnemy.ApplyEncounterTuning(BatDescendSpeed, BatShootInterval, BatBulletSpeed, BatBulletDamage);
+        batEnemy.ApplyEncounterTuning(BatShootInterval, BatBulletSpeed, BatBulletDamage);
         batEnemy.Configure(playerTarget, bulletSpawn, spawnPoints, bulletMaterial, playerHealth);
 
         EnemyPickupDropper pickupDropper = bat.GetComponent<EnemyPickupDropper>();
@@ -233,6 +237,11 @@ public static class BatEncounterBootstrap
     private static Transform EnsureBulletSpawnPoint(Transform bat)
     {
         Transform visualEyes = FindChildRecursive(bat, "Eyes_Bullet_Spawn");
+        if (visualEyes != null)
+        {
+            return visualEyes;
+        }
+
         Transform bulletSpawn = bat.Find("Bat_Bullet_Muzzle");
         if (bulletSpawn == null)
         {
@@ -240,16 +249,7 @@ public static class BatEncounterBootstrap
             bulletSpawn.SetParent(bat, false);
         }
 
-        if (visualEyes != null && IsReasonableEyePosition(bat, visualEyes.position))
-        {
-            bulletSpawn.SetPositionAndRotation(visualEyes.position, visualEyes.rotation);
-            bulletSpawn.SetParent(bat, true);
-        }
-        else
-        {
-            PositionFallbackBulletSpawn(bat, bulletSpawn);
-        }
-
+        PositionFallbackBulletSpawn(bat, bulletSpawn);
         bulletSpawn.localScale = Vector3.one;
         return bulletSpawn;
     }

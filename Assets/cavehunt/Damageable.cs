@@ -23,8 +23,16 @@ public class Damageable : MonoBehaviour
 
     private void Awake()
     {
+        EnsureValidMaxHealth();
         currentHealth = maxHealth;
         HealthChanged?.Invoke(currentHealth, maxHealth);
+    }
+
+    public void EnsureValidMaxHealth(float fallback = 3f)
+    {
+        if (maxHealth > 0f) return;
+
+        maxHealth = Mathf.Max(1f, fallback);
     }
 
     public void SetMaxHealth(float value, bool resetCurrentHealth = true)

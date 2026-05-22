@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Damageable))]
@@ -6,6 +7,7 @@ public class BatEnemy : MonoBehaviour
     [Header("References")]
     [SerializeField] private Transform playerTarget;
     [SerializeField] private Transform bulletSpawnPoint;
+    [SerializeField] private Transform[] eyeBulletSpawnPoints;
     [SerializeField] private Transform[] ceilingSpawnPoints;
     [SerializeField] private Material bulletMaterial;
 
@@ -20,6 +22,7 @@ public class BatEnemy : MonoBehaviour
     [SerializeField] private float spawnPositionJitter = 0.35f;
     [SerializeField] private float spawnHeightJitter = 0.1f;
     [SerializeField] private bool facePlayerOnSpawn = true;
+    [SerializeField, Range(-180f, 180f)] private float facePlayerYawOffsetDegrees = 0f;
     [SerializeField] private Vector2 firstShotDelayMultiplierRange = new Vector2(0.35f, 0.75f);
 
     [Header("Shooting")]
@@ -29,6 +32,8 @@ public class BatEnemy : MonoBehaviour
     [SerializeField] private float bulletSize = 0.18f;
     [SerializeField] private float bulletTargetHitRadius = 0.85f;
     [SerializeField] private float bulletLifetimePadding = 2f;
+    [SerializeField] private float centeredSpawnPointTolerance = 0.35f;
+    [SerializeField] private float muzzleSurfacePadding = 0.18f;
 
     private Damageable damageable;
     private float shootTimer;
@@ -41,24 +46,42 @@ public class BatEnemy : MonoBehaviour
     private bool[] initialColliderStates;
     private PlayerHealth playerHealth;
     private EnemyPickupDropper pickupDropper;
+    private int nextEyeSpawnIndex;
 
     public bool IsPresenting => !waitingForRespawn;
+    public Transform BulletSpawnPoint => bulletSpawnPoint;
+    public bool HasEyeBulletSpawnPoints => HasConfiguredEyeSpawnPoints();
 
     public void Configure(Transform target, Transform spawnPoint, Transform[] spawnPoints, Material redBulletMaterial, PlayerHealth targetHealth)
     {
         PrepareDamageable();
         playerTarget = target;
         playerHealth = targetHealth;
-        bulletSpawnPoint = spawnPoint != null ? spawnPoint : transform;
+        CollectEyeBulletSpawnPointsIfNeeded();
+
+        if (bulletSpawnPoint == null && spawnPoint != null)
+        {
+            bulletSpawnPoint = spawnPoint;
+        }
+
+        if (bulletSpawnPoint == null && HasConfiguredEyeSpawnPoints())
+        {
+            bulletSpawnPoint = eyeBulletSpawnPoints[0];
+        }
+
+        if (bulletSpawnPoint == null)
+        {
+            bulletSpawnPoint = transform;
+        }
+
         ceilingSpawnPoints = spawnPoints;
         bulletMaterial = redBulletMaterial;
         CachePresentationComponents();
         CachePickupDropper();
     }
 
-    public void ApplyEncounterTuning(float newDescendSpeed, float newShootInterval, float newBulletSpeed, float newBulletDamage)
+    public void ApplyEncounterTuning(float newShootInterval, float newBulletSpeed, float newBulletDamage)
     {
-        descendSpeed = Mathf.Max(0.1f, newDescendSpeed);
         shootInterval = Mathf.Max(0.1f, newShootInterval);
         bulletSpeed = Mathf.Max(0.1f, newBulletSpeed);
         bulletDamage = Mathf.Max(0f, newBulletDamage);
@@ -72,6 +95,7 @@ public class BatEnemy : MonoBehaviour
     private void Awake()
     {
         PrepareDamageable();
+        CollectEyeBulletSpawnPointsIfNeeded();
         CachePresentationComponents();
         CachePickupDropper();
     }
@@ -92,6 +116,7 @@ public class BatEnemy : MonoBehaviour
     private void Start()
     {
         CachePresentationComponents();
+        CollectEyeBulletSpawnPointsIfNeeded();
 
         if (playerTarget == null && Camera.main != null)
         {
@@ -125,11 +150,10 @@ public class BatEnemy : MonoBehaviour
     {
         if (!facePlayerOnSpawn || playerTarget == null) return;
 
-        Vector3 lookDirection = playerTarget.position - transform.position;
-        lookDirection.y = 0f;
-        if (lookDirection.sqrMagnitude <= 0.0001f) return;
-
-        transform.rotation = Quaternion.LookRotation(lookDirection.normalized, Vector3.up);
+        if (TryGetLookRotation(transform.position, playerTarget.position, out Quaternion lookRotation))
+        {
+            transform.rotation = ApplyFacePlayerRotationOffset(lookRotation);
+        }
     }
 
     private void MoveTowardGround()
@@ -154,8 +178,10 @@ public class BatEnemy : MonoBehaviour
 
         shootTimer = shootInterval;
 
-        Vector3 muzzlePosition = bulletSpawnPoint != null ? bulletSpawnPoint.position : transform.position;
         Vector3 aimPoint = GetPlayerAimPoint();
+        Transform shotSpawnPoint = ResolveNextBulletSpawnPoint();
+        AimSpawnPointAtTarget(shotSpawnPoint, aimPoint);
+        Vector3 muzzlePosition = ResolveMuzzlePosition(aimPoint, shotSpawnPoint);
         Vector3 direction = aimPoint - muzzlePosition;
         if (direction.sqrMagnitude <= 0.0001f) return;
         direction.Normalize();
@@ -255,7 +281,7 @@ public class BatEnemy : MonoBehaviour
 
         damageable.DeactivateOnDeath = false;
         damageable.Died -= HandleDeath;
-            damageable.Died += HandleDeath;
+        damageable.Died += HandleDeath;
     }
 
     private void CachePickupDropper()
@@ -428,6 +454,191 @@ public class BatEnemy : MonoBehaviour
         return playerTarget.position;
     }
 
+    private Transform ResolveNextBulletSpawnPoint()
+    {
+        CollectEyeBulletSpawnPointsIfNeeded();
+
+        if (HasConfiguredEyeSpawnPoints())
+        {
+            for (int i = 0; i < eyeBulletSpawnPoints.Length; i++)
+            {
+                int index = nextEyeSpawnIndex % eyeBulletSpawnPoints.Length;
+                nextEyeSpawnIndex = (nextEyeSpawnIndex + 1) % eyeBulletSpawnPoints.Length;
+
+                Transform candidate = eyeBulletSpawnPoints[index];
+                if (candidate != null)
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return bulletSpawnPoint != null ? bulletSpawnPoint : transform;
+    }
+
+    private Vector3 ResolveMuzzlePosition(Vector3 aimPoint, Transform spawnPoint)
+    {
+        Transform resolvedSpawnPoint = spawnPoint != null ? spawnPoint : bulletSpawnPoint;
+        Vector3 spawnPosition = resolvedSpawnPoint != null ? resolvedSpawnPoint.position : transform.position;
+        if (IsConfiguredEyeSpawnPoint(resolvedSpawnPoint)) return spawnPosition;
+
+        if (!TryGetVisibleBodyBounds(out Bounds bounds)) return spawnPosition;
+
+        float centeredTolerance = Mathf.Max(0.01f, bounds.extents.magnitude * centeredSpawnPointTolerance);
+        if (Vector3.Distance(spawnPosition, bounds.center) > centeredTolerance)
+        {
+            return spawnPosition;
+        }
+
+        Vector3 fireDirection = aimPoint - bounds.center;
+        if (fireDirection.sqrMagnitude <= 0.0001f)
+        {
+            fireDirection = transform.forward;
+        }
+
+        fireDirection.Normalize();
+        float projectedBodyRadius =
+            Mathf.Abs(fireDirection.x) * bounds.extents.x +
+            Mathf.Abs(fireDirection.y) * bounds.extents.y +
+            Mathf.Abs(fireDirection.z) * bounds.extents.z;
+
+        return bounds.center + fireDirection * (projectedBodyRadius + bulletSize + muzzleSurfacePadding);
+    }
+
+    private void CollectEyeBulletSpawnPointsIfNeeded()
+    {
+        if (HasConfiguredEyeSpawnPoints()) return;
+
+        List<Transform> candidates = new List<Transform>();
+        for (int i = 0; i < transform.childCount; i++)
+        {
+            Transform child = transform.GetChild(i);
+            if (IsLikelyEyeSpawnMarker(child))
+            {
+                candidates.Add(child);
+            }
+        }
+
+        if (candidates.Count == 0)
+        {
+            Transform visualEyes = FindChildRecursive(transform, "Eyes_Bullet_Spawn");
+            if (visualEyes != null)
+            {
+                candidates.Add(visualEyes);
+            }
+        }
+
+        candidates.Sort((left, right) => left.localPosition.x.CompareTo(right.localPosition.x));
+        eyeBulletSpawnPoints = candidates.ToArray();
+    }
+
+    private bool HasConfiguredEyeSpawnPoints()
+    {
+        if (eyeBulletSpawnPoints == null || eyeBulletSpawnPoints.Length == 0) return false;
+
+        for (int i = 0; i < eyeBulletSpawnPoints.Length; i++)
+        {
+            if (eyeBulletSpawnPoints[i] != null && eyeBulletSpawnPoints[i].IsChildOf(transform))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsConfiguredEyeSpawnPoint(Transform candidate)
+    {
+        if (candidate == null || eyeBulletSpawnPoints == null || !candidate.IsChildOf(transform)) return false;
+
+        for (int i = 0; i < eyeBulletSpawnPoints.Length; i++)
+        {
+            if (eyeBulletSpawnPoints[i] == candidate)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsLikelyEyeSpawnMarker(Transform candidate)
+    {
+        if (candidate == null || candidate == transform) return false;
+        if (candidate.GetComponent<Renderer>() != null) return false;
+        if (candidate.GetComponent<Collider>() != null) return false;
+        if (candidate.GetComponent<BatEnemy>() != null) return false;
+        if (candidate.GetComponent<Damageable>() != null) return false;
+        if (candidate.childCount > 0) return false;
+
+        string lowerName = candidate.name.ToLowerInvariant();
+        if (lowerName == "eyes_bullet_spawn") return false;
+        if (lowerName.Contains("health bar") || lowerName.Contains("bullet_muzzle")) return false;
+
+        return lowerName.StartsWith("gameobject") ||
+            lowerName.Contains("eye") ||
+            lowerName.Contains("spawn");
+    }
+
+    private Transform FindChildRecursive(Transform parent, string name)
+    {
+        if (parent == null) return null;
+        if (parent.name == name) return parent;
+
+        foreach (Transform child in parent)
+        {
+            Transform match = FindChildRecursive(child, name);
+            if (match != null) return match;
+        }
+
+        return null;
+    }
+
+    private bool TryGetVisibleBodyBounds(out Bounds bounds)
+    {
+        bounds = default;
+
+        Renderer[] renderers = cachedRenderers != null && cachedRenderers.Length > 0
+            ? cachedRenderers
+            : GetComponentsInChildren<Renderer>(true);
+
+        bool hasBounds = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || !renderer.enabled || IsRuntimeHelper(renderer.transform)) continue;
+
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else
+            {
+                bounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        return hasBounds;
+    }
+
+    private bool IsRuntimeHelper(Transform candidate)
+    {
+        Transform current = candidate;
+        while (current != null && current != transform)
+        {
+            string lowerName = current.name.ToLowerInvariant();
+            if (lowerName.Contains("health bar") || lowerName.Contains("bullet_muzzle"))
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
+    }
+
     private PlayerHealth GetPlayerHealth()
     {
         if (playerHealth == null)
@@ -477,14 +688,40 @@ public class BatEnemy : MonoBehaviour
             return spawnPoint.rotation;
         }
 
-        Vector3 lookDirection = playerTarget.position - spawnPosition;
-        lookDirection.y = 0f;
-        if (lookDirection.sqrMagnitude <= 0.0001f)
+        if (TryGetLookRotation(spawnPosition, playerTarget.position, out Quaternion lookRotation))
         {
-            return spawnPoint.rotation;
+            return ApplyFacePlayerRotationOffset(lookRotation);
         }
 
-        return Quaternion.LookRotation(lookDirection.normalized, Vector3.up);
+        return spawnPoint.rotation;
+    }
+
+    private void AimSpawnPointAtTarget(Transform spawnPoint, Vector3 targetPosition)
+    {
+        if (spawnPoint == null) return;
+
+        if (TryGetLookRotation(spawnPoint.position, targetPosition, out Quaternion lookRotation))
+        {
+            spawnPoint.rotation = lookRotation;
+        }
+    }
+
+    private bool TryGetLookRotation(Vector3 origin, Vector3 targetPosition, out Quaternion lookRotation)
+    {
+        Vector3 lookDirection = targetPosition - origin;
+        if (lookDirection.sqrMagnitude <= 0.0001f)
+        {
+            lookRotation = Quaternion.identity;
+            return false;
+        }
+
+        lookRotation = Quaternion.LookRotation(lookDirection.normalized, Vector3.up);
+        return true;
+    }
+
+    private Quaternion ApplyFacePlayerRotationOffset(Quaternion lookRotation)
+    {
+        return lookRotation * Quaternion.Euler(0f, facePlayerYawOffsetDegrees, 0f);
     }
 
 }

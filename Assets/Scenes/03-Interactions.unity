@@ -1494,6 +1494,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1806798292}
   m_LocalEulerAnglesHint: {x: 0, y: 270, z: 0}
+--- !u!1 &1016262714
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1016262715}
+  m_Layer: 0
+  m_Name: 'Eye2 '
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1016262715
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1016262714}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.61, y: 1.6, z: 0.82}
+  m_LocalScale: {x: 5.741858, y: 1.1485, z: 4.8691497}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1556786598}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1050889780 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 1767192433, guid: f6336ac4ac8b4d34bc5072418cdc62a0, type: 3}
@@ -2275,7 +2306,13 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: f45f16a9c61ea27429f2a430bd000086, type: 3}
+      insertIndex: 2
+      addedObject: {fileID: 1662386489}
+    - targetCorrespondingSourceObject: {fileID: -8679921383154817045, guid: f45f16a9c61ea27429f2a430bd000086, type: 3}
+      insertIndex: 3
+      addedObject: {fileID: 1016262715}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f45f16a9c61ea27429f2a430bd000086, type: 3}
       insertIndex: -1
@@ -2335,19 +2372,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BatEnemy
   playerTarget: {fileID: 738716320}
   bulletSpawnPoint: {fileID: 1556786591}
+  eyeBulletSpawnPoints: []
   ceilingSpawnPoints:
   - {fileID: 392591980}
   - {fileID: 761732089}
   - {fileID: 1295792816}
   bulletMaterial: {fileID: 2100000, guid: 5599595a72f866549ae24961065a14d2, type: 2}
-  descendSpeed: 1.25
-  groundY: 0.05
+  descendSpeed: 0.07
+  groundY: 2.18
   groundHitDamage: 1
   respawnDelay: 2
   minPlayerSpawnDistance: 1.5
   spawnPositionJitter: 0.35
   spawnHeightJitter: 0.2
   facePlayerOnSpawn: 1
+  facePlayerYawOffsetDegrees: -67
   firstShotDelayMultiplierRange: {x: 0.35, y: 0.75}
   shootInterval: 1.4
   bulletSpeed: 7
@@ -2355,6 +2394,8 @@ MonoBehaviour:
   bulletSize: 0.18
   bulletTargetHitRadius: 1
   bulletLifetimePadding: 2
+  centeredSpawnPointTolerance: 0.35
+  muzzleSurfacePadding: 0.18
 --- !u!114 &1556786594
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2367,7 +2408,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5531238d3c438a429efcadb94e65d84, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Damageable
-  maxHealth: 3
+  maxHealth: 1
   deactivateOnDeath: 1
   onDeath:
     m_PersistentCalls:
@@ -2384,13 +2425,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0b745c3a22e83c6418a10ed8d3d7d457, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyPickupDropper
-  dropChance: 0.25
+  dropChance: 1
   pickupPrefabs:
   - {fileID: 6027716924881983425, guid: f6e3a39856841364595bc3a6181c723f, type: 3}
   - {fileID: 3630398809516854432, guid: cc84cf9f0ca35214b941b22d2773963a, type: 3}
   - {fileID: 4955386078752460977, guid: 32c3dbce48d529f44adaaec0d32f86be, type: 3}
   spawnLift: 0.25
   horizontalJitter: 0.2
+  groundProbeStartHeight: 2
+  groundProbeDistance: 50
+--- !u!4 &1556786598 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: f45f16a9c61ea27429f2a430bd000086, type: 3}
+  m_PrefabInstance: {fileID: 1556786589}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1566313469
 GameObject:
   m_ObjectHideFlags: 0
@@ -2579,6 +2627,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5174204505564814050, guid: 8ff3d054481048742974a00910490ed4, type: 3}
   m_PrefabInstance: {fileID: 9008240731169571813}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1662386488
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1662386489}
+  m_Layer: 0
+  m_Name: Eye1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1662386489
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1662386488}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.96, y: 1.6, z: 0.3}
+  m_LocalScale: {x: 5.741858, y: 1.1485, z: 4.8691497}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1556786598}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1775212022
 GameObject:
   m_ObjectHideFlags: 0

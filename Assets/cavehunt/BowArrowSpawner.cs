@@ -15,6 +15,7 @@ public class BowArrowSpawner : MonoBehaviour
     private GameObject currentArrowInstance;
     private Arrow currentArrow;
     private Collider[] bowColliders;
+    private Collider[] playerColliders;
     private Vector3 arrowStartLocalPosition;
     private float stringPullPointStartLocalX;
     private bool hasPullStartX;
@@ -24,11 +25,13 @@ public class BowArrowSpawner : MonoBehaviour
     private void Awake()
     {
         bowColliders = GetComponentsInChildren<Collider>();
+        CachePlayerColliders();
     }
 
     private void Start()
     {
         ResolveAmmoInventory();
+        CachePlayerColliders();
         SpawnArrow();
     }
 
@@ -36,6 +39,9 @@ public class BowArrowSpawner : MonoBehaviour
     {
         if (currentArrowInstance != null) return;
         if (arrowPrefab == null || arrowSpawnPoint == null) return;
+
+        ResolveAmmoInventory();
+        CachePlayerColliders();
 
         currentArrowInstance = Instantiate(
             arrowPrefab,
@@ -58,6 +64,8 @@ public class BowArrowSpawner : MonoBehaviour
         currentArrow.SetAmmoType(ResolveCurrentAmmoType());
 
         Collider[] arrowColliders = currentArrowInstance.GetComponentsInChildren<Collider>();
+        currentArrow.IgnoreCollisionsWith(bowColliders);
+        currentArrow.IgnoreCollisionsWith(playerColliders);
 
         foreach (Collider bowCol in bowColliders)
         {
@@ -66,6 +74,8 @@ public class BowArrowSpawner : MonoBehaviour
                 Physics.IgnoreCollision(bowCol, arrowCol, true);
             }
         }
+
+        IgnorePlayerCollisions(arrowColliders);
     }
 
     public void MoveCurrentArrowToString(Transform stringPullPoint)
@@ -134,5 +144,57 @@ public class BowArrowSpawner : MonoBehaviour
         if (ammoInventory != null) return;
 
         ammoInventory = FindAnyObjectByType<PlayerAmmoInventory>();
+    }
+
+    private void CachePlayerColliders()
+    {
+        Transform playerRoot = ResolvePlayerRoot();
+        playerColliders = playerRoot != null
+            ? playerRoot.GetComponentsInChildren<Collider>(true)
+            : new Collider[0];
+    }
+
+    private Transform ResolvePlayerRoot()
+    {
+        if (ammoInventory != null)
+        {
+            return ammoInventory.transform;
+        }
+
+        PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>();
+        if (playerHealth != null)
+        {
+            return playerHealth.transform;
+        }
+
+        GameObject xrOrigin = GameObject.Find("XR Origin (XR Rig)") ?? GameObject.Find("XR Origin (VR)");
+        if (xrOrigin != null)
+        {
+            return xrOrigin.transform;
+        }
+
+        return Camera.main != null ? Camera.main.transform.root : null;
+    }
+
+    private void IgnorePlayerCollisions(Collider[] arrowColliders)
+    {
+        if (arrowColliders == null || arrowColliders.Length == 0) return;
+
+        CachePlayerColliders();
+
+        for (int i = 0; i < arrowColliders.Length; i++)
+        {
+            Collider arrowCollider = arrowColliders[i];
+            if (arrowCollider == null) continue;
+
+            for (int j = 0; j < playerColliders.Length; j++)
+            {
+                Collider playerCollider = playerColliders[j];
+                if (playerCollider != null)
+                {
+                    Physics.IgnoreCollision(arrowCollider, playerCollider, true);
+                }
+            }
+        }
     }
 }

@@ -11,17 +11,27 @@ public class Arrow : MonoBehaviour
     [SerializeField] private int fireTickCount = 2;
     [SerializeField] private int extraFireTicksIfAlreadyBurning = 1;
     [SerializeField] private float fireTickInterval = 1f;
+    [SerializeField] private float hitScanRadius = 0.24f;
 
     private Rigidbody rb;
+    private Collider[] ownColliders;
     private bool hasBeenShot = false;
+    private bool hasResolvedHit;
+    private bool hasPreviousPosition;
+    private Vector3 previousPosition;
     private AmmoType ammoType = AmmoType.Normal;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        ownColliders = GetComponentsInChildren<Collider>(true);
+
+        if (rb == null) return;
 
         rb.isKinematic = true;
         rb.useGravity = false;
+        rb.detectCollisions = false;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
     }
 
     public void SetAmmoType(AmmoType newAmmoType)
@@ -31,30 +41,146 @@ public class Arrow : MonoBehaviour
 
     public void Shoot(Vector3 direction, float force)
     {
-        if (hasBeenShot) return;
+        if (hasBeenShot || rb == null) return;
 
         hasBeenShot = true;
+        hasResolvedHit = false;
 
         transform.parent = null;
 
+        rb.detectCollisions = true;
         rb.isKinematic = false;
         rb.useGravity = true;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+        rb.interpolation = RigidbodyInterpolation.Interpolate;
 
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
+        previousPosition = rb.position;
+        hasPreviousPosition = true;
 
         rb.AddForce(direction.normalized * force, ForceMode.Impulse);
 
         Destroy(gameObject, lifeTime);
     }
 
+    private void FixedUpdate()
+    {
+        if (!hasBeenShot || hasResolvedHit) return;
+
+        Vector3 currentPosition = rb != null ? rb.position : transform.position;
+        if (!hasPreviousPosition)
+        {
+            previousPosition = currentPosition;
+            hasPreviousPosition = true;
+            return;
+        }
+
+        ScanFlightPath(previousPosition, currentPosition);
+        previousPosition = currentPosition;
+    }
+
+    public void IgnoreCollisionsWith(Collider[] colliders)
+    {
+        if (colliders == null || colliders.Length == 0) return;
+
+        if (ownColliders == null || ownColliders.Length == 0)
+        {
+            ownColliders = GetComponentsInChildren<Collider>(true);
+        }
+
+        for (int i = 0; i < ownColliders.Length; i++)
+        {
+            Collider ownCollider = ownColliders[i];
+            if (ownCollider == null) continue;
+
+            for (int j = 0; j < colliders.Length; j++)
+            {
+                Collider otherCollider = colliders[j];
+                if (otherCollider != null && otherCollider != ownCollider)
+                {
+                    Physics.IgnoreCollision(ownCollider, otherCollider, true);
+                }
+            }
+        }
+    }
+
     private void OnCollisionEnter(Collision collision)
     {
-        if (!hasBeenShot) return;
+        if (!hasBeenShot || hasResolvedHit) return;
 
-        Damageable damageable = collision.collider.GetComponentInParent<Damageable>();
+        if (collision.collider.GetComponentInParent<PlayerHealth>() != null)
+        {
+            IgnoreCollisionsWith(new[] { collision.collider });
+            return;
+        }
+
+        Vector3 hitPoint = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
+        ResolveHit(collision.collider, hitPoint);
+    }
+
+    private void ScanFlightPath(Vector3 startPosition, Vector3 endPosition)
+    {
+        Vector3 segment = endPosition - startPosition;
+        float distance = segment.magnitude;
+        if (distance <= 0.0001f) return;
+
+        RaycastHit[] hits = Physics.SphereCastAll(
+            startPosition,
+            Mathf.Max(0.01f, hitScanRadius),
+            segment / distance,
+            distance,
+            ~0,
+            QueryTriggerInteraction.Ignore
+        );
+
+        float nearestDistance = float.PositiveInfinity;
+        RaycastHit nearestHit = default;
+        bool foundHit = false;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            RaycastHit hit = hits[i];
+            if (!CanDamageCollider(hit.collider)) continue;
+
+            if (hit.distance < nearestDistance)
+            {
+                nearestDistance = hit.distance;
+                nearestHit = hit;
+                foundHit = true;
+            }
+        }
+
+        if (foundHit)
+        {
+            ResolveHit(nearestHit.collider, nearestHit.point);
+        }
+    }
+
+    private bool CanDamageCollider(Collider collider)
+    {
+        if (collider == null || collider.GetComponentInParent<PlayerHealth>() != null) return false;
+
+        for (int i = 0; ownColliders != null && i < ownColliders.Length; i++)
+        {
+            if (collider == ownColliders[i])
+            {
+                return false;
+            }
+        }
+
+        return collider.GetComponentInParent<Damageable>() != null;
+    }
+
+    private void ResolveHit(Collider hitCollider, Vector3 hitPoint)
+    {
+        if (hitCollider == null || hasResolvedHit) return;
+
+        Damageable damageable = hitCollider.GetComponentInParent<Damageable>();
         if (ammoType == AmmoType.Grenade)
         {
+            hasResolvedHit = true;
+            transform.position = hitPoint;
             Explode(damageable);
             Destroy(gameObject);
             return;
@@ -62,6 +188,8 @@ public class Arrow : MonoBehaviour
 
         if (damageable == null) return;
 
+        hasResolvedHit = true;
+        transform.position = hitPoint;
         damageable.TakeDamage(damage);
 
         if (ammoType == AmmoType.Fire)
