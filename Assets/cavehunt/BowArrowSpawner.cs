@@ -5,9 +5,12 @@ public class BowArrowSpawner : MonoBehaviour
     [Header("References")]
     [SerializeField] private Transform arrowSpawnPoint;
     [SerializeField] private GameObject arrowPrefab;
+    [SerializeField] private PlayerAmmoInventory ammoInventory;
 
     [Header("Shoot Settings")]
     [SerializeField] private float shootForce = 20f;
+    [SerializeField] private float airForceMultiplier = 2f;
+    [SerializeField] private float airShotOffset = 0.16f;
 
     private GameObject currentArrowInstance;
     private Arrow currentArrow;
@@ -25,6 +28,7 @@ public class BowArrowSpawner : MonoBehaviour
 
     private void Start()
     {
+        ResolveAmmoInventory();
         SpawnArrow();
     }
 
@@ -50,6 +54,8 @@ public class BowArrowSpawner : MonoBehaviour
             Debug.LogWarning("Arrow Prefab hat kein Arrow-Script.");
             return;
         }
+
+        currentArrow.SetAmmoType(ResolveCurrentAmmoType());
 
         Collider[] arrowColliders = currentArrowInstance.GetComponentsInChildren<Collider>();
 
@@ -90,7 +96,18 @@ public class BowArrowSpawner : MonoBehaviour
     {
         if (currentArrow == null) return;
 
-        currentArrow.Shoot(arrowSpawnPoint.forward, force);
+        AmmoType shotAmmo = ResolveShotAmmoType();
+        float adjustedForce = force;
+
+        currentArrow.SetAmmoType(shotAmmo);
+
+        if (shotAmmo == AmmoType.Air)
+        {
+            adjustedForce *= Mathf.Max(1f, airForceMultiplier);
+            currentArrow.transform.position += arrowSpawnPoint.right * airShotOffset;
+        }
+
+        currentArrow.Shoot(arrowSpawnPoint.forward, adjustedForce);
 
         currentArrow = null;
         currentArrowInstance = null;
@@ -98,5 +115,24 @@ public class BowArrowSpawner : MonoBehaviour
         stringPullPointStartLocalX = 0f;
 
         Invoke(nameof(SpawnArrow), 0.3f);
+    }
+
+    private AmmoType ResolveCurrentAmmoType()
+    {
+        ResolveAmmoInventory();
+        return ammoInventory != null ? ammoInventory.CurrentAmmo : AmmoType.Normal;
+    }
+
+    private AmmoType ResolveShotAmmoType()
+    {
+        ResolveAmmoInventory();
+        return ammoInventory != null ? ammoInventory.ConsumeCurrentShot() : AmmoType.Normal;
+    }
+
+    private void ResolveAmmoInventory()
+    {
+        if (ammoInventory != null) return;
+
+        ammoInventory = FindAnyObjectByType<PlayerAmmoInventory>();
     }
 }
