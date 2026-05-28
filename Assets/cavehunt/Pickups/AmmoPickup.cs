@@ -50,6 +50,16 @@ public class AmmoPickup : MonoBehaviour
 
         collected = true;
         inventory.AddAmmo(ammoType, ammoAmount, switchToAmmoOnPickup);
+
+        if (ammoType == AmmoType.Air)
+        {
+            ProceduralGameAudio.PlayAirPickup(transform.position);
+        }
+        else
+        {
+            ProceduralGameAudio.PlayPickup(transform.position);
+        }
+
         Destroy(gameObject);
     }
 

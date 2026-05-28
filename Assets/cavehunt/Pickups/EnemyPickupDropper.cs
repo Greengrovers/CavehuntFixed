@@ -10,9 +10,35 @@ public class EnemyPickupDropper : MonoBehaviour
     [SerializeField] private float groundProbeStartHeight = 2f;
     [SerializeField] private float groundProbeDistance = 50f;
 
+    [Header("Boundary Drop")]
+    [SerializeField] private bool dropInsidePlayerBoundary = true;
+    [SerializeField] private float boundaryRadius = 100f;
+    [SerializeField] private float boundaryPadding = 8f;
+    [SerializeField] private float minimumPlayerDropDistance = 10f;
+    [SerializeField] private int dropPositionAttempts = 12;
+
+    [Header("Pickup Marker")]
+    [SerializeField] private bool showPickupArrow = true;
+    [SerializeField] private Color pickupArrowColor = new Color(0.45f, 0.9f, 1f, 1f);
+    [SerializeField] private float pickupArrowHeight = 2.4f;
+    [SerializeField] private float pickupArrowScale = 0.9f;
+
+    [Header("Trap")]
+    [SerializeField, Range(0f, 1f)] private float trapSpawnChance = 0.25f;
+    [SerializeField] private GameObject spikeTrapTemplate;
+    [SerializeField] private string spikeTrapSceneObjectName = "Trap";
+    [SerializeField] private float trapPlayerSpacing = 6f;
+    [SerializeField] private float trapPickupSpacing = 4f;
+    [SerializeField] private float trapSpawnLift = 0f;
+    [SerializeField] private float trapDamage = 1f;
+
+    private Transform cachedPlayerTarget;
+    private GameObject cachedSpikeTrapTemplate;
+
     private void Awake()
     {
         EnsurePickupPrefabs();
+        ResolveSpikeTrapTemplate();
     }
 
     public void Configure(float chance, GameObject[] prefabs = null)
@@ -46,8 +72,7 @@ public class EnemyPickupDropper : MonoBehaviour
         if (validPrefabs.Count == 0) return null;
 
         GameObject prefab = validPrefabs[Random.Range(0, validPrefabs.Count)];
-        Vector2 jitter = Random.insideUnitCircle * horizontalJitter;
-        Vector3 spawnPosition = ResolveGroundDropPosition(enemyPosition, jitter);
+        Vector3 spawnPosition = ResolveDropPosition(enemyPosition);
         GameObject pickup = Instantiate(prefab, spawnPosition, Quaternion.identity);
 
         PickupDropAnimation dropAnimation = pickup.GetComponent<PickupDropAnimation>();
@@ -56,12 +81,78 @@ public class EnemyPickupDropper : MonoBehaviour
             dropAnimation.PlayDrop();
         }
 
+        AttachPickupArrow(pickup);
+        TrySpawnTrapBetweenPlayerAndPickup(spawnPosition);
+
         return pickup;
     }
 
-    private Vector3 ResolveGroundDropPosition(Vector3 enemyPosition, Vector2 jitter)
+    private Vector3 ResolveDropPosition(Vector3 enemyPosition)
     {
-        Vector3 horizontalDropPosition = enemyPosition + new Vector3(jitter.x, 0f, jitter.y);
+        if (!dropInsidePlayerBoundary)
+        {
+            Vector2 jitter = Random.insideUnitCircle * horizontalJitter;
+            return ResolveGroundDropPosition(enemyPosition, jitter);
+        }
+
+        Transform playerTarget = ResolvePlayerTarget();
+        if (playerTarget == null)
+        {
+            Vector2 jitter = Random.insideUnitCircle * horizontalJitter;
+            return ResolveGroundDropPosition(enemyPosition, jitter);
+        }
+
+        Vector3 center = playerTarget.position;
+        float maxRadius = Mathf.Max(1f, boundaryRadius - Mathf.Max(0f, boundaryPadding));
+        float minRadius = Mathf.Clamp(minimumPlayerDropDistance, 0f, maxRadius - 0.5f);
+        int attempts = Mathf.Max(1, dropPositionAttempts);
+
+        for (int i = 0; i < attempts; i++)
+        {
+            Vector2 offset = Random.insideUnitCircle;
+            if (offset.sqrMagnitude < 0.0001f)
+            {
+                float angle = Random.value * Mathf.PI * 2f;
+                offset = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+            }
+
+            float distance = Mathf.Lerp(minRadius, maxRadius, Mathf.Sqrt(Random.value));
+            offset = offset.normalized * distance;
+            Vector3 horizontalPosition = new Vector3(center.x + offset.x, enemyPosition.y, center.z + offset.y);
+            Vector3 resolvedPosition = ResolveGroundDropPosition(horizontalPosition, Vector2.zero);
+
+            if (IsInsideBoundary(resolvedPosition, center, maxRadius))
+            {
+                return resolvedPosition;
+            }
+        }
+
+        Vector3 fallbackOffset = (enemyPosition - center);
+        fallbackOffset.y = 0f;
+        if (fallbackOffset.sqrMagnitude < minRadius * minRadius)
+        {
+            fallbackOffset = Random.insideUnitSphere;
+            fallbackOffset.y = 0f;
+        }
+
+        fallbackOffset = Vector3.ClampMagnitude(fallbackOffset, maxRadius);
+        if (fallbackOffset.magnitude < minRadius)
+        {
+            fallbackOffset = fallbackOffset.normalized * minRadius;
+        }
+
+        Vector3 fallbackPosition = new Vector3(center.x + fallbackOffset.x, enemyPosition.y, center.z + fallbackOffset.z);
+        return ResolveGroundDropPosition(fallbackPosition, Vector2.zero);
+    }
+
+    private Vector3 ResolveGroundDropPosition(Vector3 horizontalPosition, Vector2 jitter)
+    {
+        return ResolveGroundDropPosition(horizontalPosition, jitter, spawnLift);
+    }
+
+    private Vector3 ResolveGroundDropPosition(Vector3 horizontalPosition, Vector2 jitter, float lift)
+    {
+        Vector3 horizontalDropPosition = horizontalPosition + new Vector3(jitter.x, 0f, jitter.y);
         Vector3 probeStart = horizontalDropPosition + Vector3.up * Mathf.Max(0.1f, groundProbeStartHeight);
         float probeDistance = Mathf.Max(0.1f, groundProbeStartHeight + groundProbeDistance);
 
@@ -92,10 +183,10 @@ public class EnemyPickupDropper : MonoBehaviour
 
         if (foundGround)
         {
-            return nearestGroundHit.point + nearestGroundHit.normal * Mathf.Max(0f, spawnLift);
+            return nearestGroundHit.point + nearestGroundHit.normal * Mathf.Max(0f, lift);
         }
 
-        return horizontalDropPosition + Vector3.up * Mathf.Max(0f, spawnLift);
+        return horizontalDropPosition + Vector3.up * Mathf.Max(0f, lift);
     }
 
     private bool IsGroundDropSurface(Collider candidate)
@@ -106,8 +197,129 @@ public class EnemyPickupDropper : MonoBehaviour
         if (candidate.GetComponentInParent<Damageable>() != null) return false;
         if (candidate.GetComponentInParent<PlayerHealth>() != null) return false;
         if (candidate.GetComponentInParent<AmmoPickup>() != null) return false;
+        if (candidate.GetComponentInParent<SpikeTrap>() != null) return false;
 
         return true;
+    }
+
+    private void AttachPickupArrow(GameObject pickup)
+    {
+        if (!showPickupArrow || pickup == null) return;
+
+        PickupLocationArrow.Attach(
+            pickup.transform,
+            pickupArrowColor,
+            pickupArrowHeight,
+            pickupArrowScale
+        );
+    }
+
+    private void TrySpawnTrapBetweenPlayerAndPickup(Vector3 pickupPosition)
+    {
+        if (trapSpawnChance <= 0f || Random.value > trapSpawnChance) return;
+
+        Transform playerTarget = ResolvePlayerTarget();
+        GameObject template = ResolveSpikeTrapTemplate();
+        if (playerTarget == null || template == null) return;
+
+        Vector3 playerPosition = playerTarget.position;
+        Vector3 toPickup = pickupPosition - playerPosition;
+        toPickup.y = 0f;
+
+        float distance = toPickup.magnitude;
+        if (distance < 1f) return;
+
+        Vector3 direction = toPickup / distance;
+        float lower = Mathf.Clamp01(trapPlayerSpacing / distance);
+        float upper = Mathf.Clamp01(1f - trapPickupSpacing / distance);
+        float t = lower < upper ? Random.Range(lower, upper) : 0.5f;
+
+        Vector3 trapHorizontalPosition = playerPosition + direction * (distance * t);
+        trapHorizontalPosition.y = pickupPosition.y;
+        Vector3 trapPosition = ResolveGroundDropPosition(trapHorizontalPosition, Vector2.zero, 0f) + Vector3.up * Mathf.Max(0f, trapSpawnLift);
+        Quaternion trapRotation = template.transform.rotation;
+
+        GameObject trapObject = Instantiate(template, trapPosition, trapRotation);
+        trapObject.name = "Spike Trap";
+        trapObject.SetActive(true);
+
+        SpikeTrap trap = trapObject.GetComponent<SpikeTrap>();
+        if (trap == null)
+        {
+            trap = trapObject.AddComponent<SpikeTrap>();
+        }
+
+        trap.Configure(trapDamage);
+    }
+
+    private GameObject ResolveSpikeTrapTemplate()
+    {
+        if (spikeTrapTemplate != null) return spikeTrapTemplate;
+        if (cachedSpikeTrapTemplate != null) return cachedSpikeTrapTemplate;
+
+        GameObject trapParent = GameObject.Find("Trap");
+        if (trapParent != null)
+        {
+            cachedSpikeTrapTemplate = CreateSpikeTrapTemplate(trapParent);
+            return cachedSpikeTrapTemplate;
+        }
+
+        if (!string.IsNullOrEmpty(spikeTrapSceneObjectName))
+        {
+            cachedSpikeTrapTemplate = GameObject.Find(spikeTrapSceneObjectName);
+            if (cachedSpikeTrapTemplate != null && cachedSpikeTrapTemplate.transform.parent != null)
+            {
+                cachedSpikeTrapTemplate = cachedSpikeTrapTemplate.transform.parent.gameObject;
+            }
+
+            if (cachedSpikeTrapTemplate != null)
+            {
+                cachedSpikeTrapTemplate = CreateSpikeTrapTemplate(cachedSpikeTrapTemplate);
+            }
+        }
+
+        return cachedSpikeTrapTemplate;
+    }
+
+    private GameObject CreateSpikeTrapTemplate(GameObject source)
+    {
+        GameObject template = Instantiate(source);
+        template.name = "Spike Trap Template";
+        template.SetActive(false);
+        return template;
+    }
+
+    private Transform ResolvePlayerTarget()
+    {
+        if (cachedPlayerTarget != null) return cachedPlayerTarget;
+
+        PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>();
+        if (playerHealth != null)
+        {
+            cachedPlayerTarget = playerHealth.transform;
+            return cachedPlayerTarget;
+        }
+
+        GameObject xrOrigin = GameObject.Find("XR Origin (XR Rig)") ?? GameObject.Find("XR Origin (VR)");
+        if (xrOrigin != null)
+        {
+            cachedPlayerTarget = xrOrigin.transform;
+            return cachedPlayerTarget;
+        }
+
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            cachedPlayerTarget = mainCamera.transform;
+        }
+
+        return cachedPlayerTarget;
+    }
+
+    private static bool IsInsideBoundary(Vector3 position, Vector3 center, float maxRadius)
+    {
+        Vector2 delta = new Vector2(position.x - center.x, position.z - center.z);
+        return delta.sqrMagnitude <= maxRadius * maxRadius;
     }
 
     private void EnsurePickupPrefabs()

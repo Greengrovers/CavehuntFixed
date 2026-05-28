@@ -11,6 +11,8 @@ public class BowArrowSpawner : MonoBehaviour
     [SerializeField] private float shootForce = 20f;
     [SerializeField] private float airForceMultiplier = 2f;
     [SerializeField] private float airShotOffset = 0.16f;
+    [SerializeField] private bool clampNockedArrowMovement = true;
+    [SerializeField] private float maxNockedArrowPullDistance = 0.41f;
 
     private GameObject currentArrowInstance;
     private Arrow currentArrow;
@@ -24,13 +26,14 @@ public class BowArrowSpawner : MonoBehaviour
 
     private void Awake()
     {
-        bowColliders = GetComponentsInChildren<Collider>();
+        RefreshBowColliders();
         CachePlayerColliders();
     }
 
     private void Start()
     {
         ResolveAmmoInventory();
+        RefreshBowColliders();
         CachePlayerColliders();
         SpawnArrow();
     }
@@ -61,6 +64,7 @@ public class BowArrowSpawner : MonoBehaviour
             return;
         }
 
+        currentArrow.PrepareForNockedArrow();
         currentArrow.SetAmmoType(ResolveCurrentAmmoType());
 
         Collider[] arrowColliders = currentArrowInstance.GetComponentsInChildren<Collider>();
@@ -90,8 +94,14 @@ public class BowArrowSpawner : MonoBehaviour
             hasPullStartX = true;
         }
 
+        float pullDeltaX = pullPointLocalPosition.x - stringPullPointStartLocalX;
+        if (clampNockedArrowMovement)
+        {
+            pullDeltaX = Mathf.Clamp(pullDeltaX, 0f, Mathf.Max(0f, maxNockedArrowPullDistance));
+        }
+
         Vector3 arrowLocalPosition = arrowStartLocalPosition;
-        arrowLocalPosition.x += pullPointLocalPosition.x - stringPullPointStartLocalX;
+        arrowLocalPosition.x += pullDeltaX;
 
         currentArrowInstance.transform.localPosition = arrowLocalPosition;
         currentArrowInstance.transform.rotation = arrowSpawnPoint.rotation;
@@ -111,13 +121,15 @@ public class BowArrowSpawner : MonoBehaviour
 
         currentArrow.SetAmmoType(shotAmmo);
 
+        ProceduralGameAudio.PlayArrowShot(arrowSpawnPoint != null ? arrowSpawnPoint.position : transform.position);
+
         if (shotAmmo == AmmoType.Air)
         {
             adjustedForce *= Mathf.Max(1f, airForceMultiplier);
             currentArrow.transform.position += arrowSpawnPoint.right * airShotOffset;
         }
 
-        currentArrow.Shoot(arrowSpawnPoint.forward, adjustedForce);
+        currentArrow.Shoot(arrowSpawnPoint.forward, Mathf.Max(0.01f, adjustedForce));
 
         currentArrow = null;
         currentArrowInstance = null;
@@ -152,6 +164,40 @@ public class BowArrowSpawner : MonoBehaviour
         playerColliders = playerRoot != null
             ? playerRoot.GetComponentsInChildren<Collider>(true)
             : new Collider[0];
+    }
+
+    private void RefreshBowColliders()
+    {
+        Collider[] allColliders = GetComponentsInChildren<Collider>(true);
+        int validCount = 0;
+        for (int i = 0; i < allColliders.Length; i++)
+        {
+            if (IsBowCollider(allColliders[i]))
+            {
+                validCount++;
+            }
+        }
+
+        bowColliders = new Collider[validCount];
+        int writeIndex = 0;
+        for (int i = 0; i < allColliders.Length; i++)
+        {
+            Collider collider = allColliders[i];
+            if (!IsBowCollider(collider)) continue;
+
+            bowColliders[writeIndex] = collider;
+            writeIndex++;
+        }
+    }
+
+    private bool IsBowCollider(Collider collider)
+    {
+        if (collider == null) return false;
+        if (currentArrowInstance != null && collider.transform.IsChildOf(currentArrowInstance.transform)) return false;
+        if (collider.GetComponentInParent<Arrow>() != null) return false;
+        if (collider.GetComponentInParent<PlayerHealth>() != null) return false;
+
+        return true;
     }
 
     private Transform ResolvePlayerRoot()

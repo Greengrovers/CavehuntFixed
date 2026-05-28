@@ -1,0 +1,14 @@
+{
+  "asset": "Geode",
+  "source_scene": "geode",
+  "selection_reason": "geode-named meshes in scene 'geode'",
+  "objects": [
+    "Cube.002",
+    "For Ref"
+  ],
+  "fbx": "C:\\Users\\stefa\\Projekt Visualy disabled\\Cavehunt\\Cavehunt\\Assets\\cavehunt\\Art\\Geode\\Geode.fbx",
+  "textures": [
+    "C:\\Users\\stefa\\Projekt Visualy disabled\\Cavehunt\\Cavehunt\\Assets\\cavehunt\\Art\\Geode\\Textures\\Geode_Cube.002_BaseColor.png",
+    "C:\\Users\\stefa\\Projekt Visualy disabled\\Cavehunt\\Cavehunt\\Assets\\cavehunt\\Art\\Geode\\Textures\\Geode_For_Ref_BaseColor.png"
+  ]
+}

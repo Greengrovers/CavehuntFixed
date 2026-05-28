@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 using UnityEngine.UI;
 
 public class PlayerAmmoInventory : MonoBehaviour
@@ -12,6 +13,9 @@ public class PlayerAmmoInventory : MonoBehaviour
 
     [Header("Testing Input")]
     [SerializeField] private bool allowKeyboardSwitching = true;
+    [SerializeField] private bool allowQuestControllerSwitching = true;
+
+    private bool questPrimaryButtonWasPressed;
 
     public AmmoType CurrentAmmo => HasAmmo(currentAmmo) ? currentAmmo : AmmoType.Normal;
 
@@ -25,28 +29,74 @@ public class PlayerAmmoInventory : MonoBehaviour
 
     private void Update()
     {
-        if (!allowKeyboardSwitching || Keyboard.current == null) return;
+        if (allowKeyboardSwitching && Keyboard.current != null)
+        {
+            if (Keyboard.current.digit1Key.wasPressedThisFrame)
+            {
+                SelectAmmo(AmmoType.Normal);
+            }
+            else if (Keyboard.current.digit2Key.wasPressedThisFrame)
+            {
+                SelectAmmo(AmmoType.Fire);
+            }
+            else if (Keyboard.current.digit3Key.wasPressedThisFrame)
+            {
+                SelectAmmo(AmmoType.Grenade);
+            }
+            else if (Keyboard.current.digit4Key.wasPressedThisFrame)
+            {
+                SelectAmmo(AmmoType.Air);
+            }
+            else if (Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.qKey.wasPressedThisFrame)
+            {
+                CycleNextAmmo();
+            }
+        }
 
-        if (Keyboard.current.digit1Key.wasPressedThisFrame)
-        {
-            SelectAmmo(AmmoType.Normal);
-        }
-        else if (Keyboard.current.digit2Key.wasPressedThisFrame)
-        {
-            SelectAmmo(AmmoType.Fire);
-        }
-        else if (Keyboard.current.digit3Key.wasPressedThisFrame)
-        {
-            SelectAmmo(AmmoType.Grenade);
-        }
-        else if (Keyboard.current.digit4Key.wasPressedThisFrame)
-        {
-            SelectAmmo(AmmoType.Air);
-        }
-        else if (Keyboard.current.tabKey.wasPressedThisFrame || Keyboard.current.qKey.wasPressedThisFrame)
+        if (allowQuestControllerSwitching && WasQuestAButtonPressedThisFrame())
         {
             CycleNextAmmo();
         }
+    }
+
+    private bool WasQuestAButtonPressedThisFrame()
+    {
+        bool isPressed = false;
+
+        foreach (InputDevice device in InputSystem.devices)
+        {
+            if (!IsRightHandController(device)) continue;
+
+            ButtonControl primaryButton = device.TryGetChildControl<ButtonControl>("primaryButton");
+            if (primaryButton == null || !primaryButton.isPressed) continue;
+
+            isPressed = true;
+            break;
+        }
+
+        bool wasPressedThisFrame = isPressed && !questPrimaryButtonWasPressed;
+        questPrimaryButtonWasPressed = isPressed;
+        return wasPressedThisFrame;
+    }
+
+    private static bool IsRightHandController(InputDevice device)
+    {
+        if (device == null) return false;
+
+        foreach (var usage in device.usages)
+        {
+            if (usage == CommonUsages.RightHand)
+            {
+                return true;
+            }
+        }
+
+        string description = $"{device.name} {device.displayName} {device.description.product}".ToLowerInvariant();
+        return description.Contains("right")
+            && (description.Contains("controller")
+                || description.Contains("touch")
+                || description.Contains("quest")
+                || description.Contains("oculus"));
     }
 
     public void AddAmmo(AmmoType ammoType, int amount, bool switchToAmmo = true)
@@ -192,6 +242,7 @@ public class AmmoHud : MonoBehaviour
     {
         public AmmoType AmmoType;
         public Image Background;
+        public Image ActiveHighlight;
         public Image ActiveMarker;
         public Text Icon;
         public Text Count;
@@ -263,7 +314,11 @@ public class AmmoHud : MonoBehaviour
         Image background = slotObject.AddComponent<Image>();
         background.color = GetBackgroundColor(ammoType, false);
 
-        Image activeMarker = CreateImage("Active Marker", slotRect, new Vector2(slotSize.x - 10f, 5f), new Vector2(0f, -slotSize.y * 0.5f + 5f));
+        Image activeHighlight = CreateImage("Active Highlight", slotRect, slotSize - new Vector2(6f, 6f), Vector2.zero);
+        activeHighlight.color = new Color(1f, 0.86f, 0.18f, 0.24f);
+        activeHighlight.enabled = false;
+
+        Image activeMarker = CreateImage("Active Marker", slotRect, new Vector2(slotSize.x - 10f, 10f), new Vector2(0f, -slotSize.y * 0.5f + 7f));
         activeMarker.color = new Color(1f, 0.86f, 0.18f, 1f);
 
         Text icon = CreateText("Icon", slotRect, GetIconText(ammoType), 28, new Vector2(slotSize.x, 40f), new Vector2(0f, 12f));
@@ -278,6 +333,7 @@ public class AmmoHud : MonoBehaviour
         {
             AmmoType = ammoType,
             Background = background,
+            ActiveHighlight = activeHighlight,
             ActiveMarker = activeMarker,
             Icon = icon,
             Count = count
@@ -348,6 +404,11 @@ public class AmmoHud : MonoBehaviour
                 slot.Background.color = GetBackgroundColor(slot.AmmoType, isActive);
             }
 
+            if (slot.ActiveHighlight != null)
+            {
+                slot.ActiveHighlight.enabled = isActive;
+            }
+
             if (slot.ActiveMarker != null)
             {
                 slot.ActiveMarker.enabled = isActive;
@@ -356,16 +417,19 @@ public class AmmoHud : MonoBehaviour
             if (slot.Count != null)
             {
                 slot.Count.text = slot.AmmoType == AmmoType.Normal ? "--" : ammoCount.ToString();
-                slot.Count.color = slot.AmmoType == AmmoType.Normal || ammoCount > 0
-                    ? Color.white
-                    : new Color(1f, 1f, 1f, 0.35f);
+                slot.Count.color = isActive
+                    ? new Color(1f, 0.92f, 0.34f, 1f)
+                    : slot.AmmoType == AmmoType.Normal || ammoCount > 0
+                        ? Color.white
+                        : new Color(1f, 1f, 1f, 0.35f);
             }
 
             if (slot.Icon != null)
             {
-                Color iconColor = GetIconColor(slot.AmmoType);
+                Color iconColor = isActive ? Color.Lerp(GetIconColor(slot.AmmoType), Color.white, 0.35f) : GetIconColor(slot.AmmoType);
                 iconColor.a = slot.AmmoType == AmmoType.Normal || ammoCount > 0 ? 1f : 0.35f;
                 slot.Icon.color = iconColor;
+                slot.Icon.fontSize = isActive ? 32 : 28;
             }
         }
     }

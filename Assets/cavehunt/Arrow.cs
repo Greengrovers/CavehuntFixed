@@ -23,14 +23,42 @@ public class Arrow : MonoBehaviour
 
     private void Awake()
     {
-        rb = GetComponent<Rigidbody>();
-        ownColliders = GetComponentsInChildren<Collider>(true);
+        CacheComponents();
 
         if (rb == null) return;
 
         rb.isKinematic = true;
         rb.useGravity = false;
         rb.detectCollisions = false;
+        rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+    }
+
+    public void PrepareForNockedArrow()
+    {
+        CacheComponents();
+
+        hasBeenShot = false;
+        hasResolvedHit = false;
+        hasPreviousPosition = false;
+
+        if (ownColliders != null)
+        {
+            for (int i = 0; i < ownColliders.Length; i++)
+            {
+                if (ownColliders[i] != null)
+                {
+                    ownColliders[i].enabled = true;
+                }
+            }
+        }
+
+        if (rb == null) return;
+
+        rb.isKinematic = true;
+        rb.useGravity = false;
+        rb.detectCollisions = false;
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
         rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
     }
 
@@ -43,6 +71,7 @@ public class Arrow : MonoBehaviour
     {
         if (hasBeenShot || rb == null) return;
 
+        CacheComponents();
         hasBeenShot = true;
         hasResolvedHit = false;
 
@@ -78,6 +107,19 @@ public class Arrow : MonoBehaviour
 
         ScanFlightPath(previousPosition, currentPosition);
         previousPosition = currentPosition;
+    }
+
+    private void CacheComponents()
+    {
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (ownColliders == null || ownColliders.Length == 0)
+        {
+            ownColliders = GetComponentsInChildren<Collider>(true);
+        }
     }
 
     public void IgnoreCollisionsWith(Collider[] colliders)
@@ -117,6 +159,14 @@ public class Arrow : MonoBehaviour
 
         Vector3 hitPoint = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
         ResolveHit(collision.collider, hitPoint);
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (!hasBeenShot || hasResolvedHit) return;
+        if (!CanDamageCollider(other)) return;
+
+        ResolveHit(other, transform.position);
     }
 
     private void ScanFlightPath(Vector3 startPosition, Vector3 endPosition)
