@@ -219,7 +219,7 @@ public class PlayerAmmoInventory : MonoBehaviour
 public class AmmoHud : MonoBehaviour
 {
     [SerializeField] private float hudDistance = 1.1f;
-    [SerializeField] private Vector2 localOffset = new Vector2(0f, -0.34f);
+    [SerializeField] private Vector2 localOffset = new Vector2(0f, -0.7f);
     [SerializeField] private Vector2 canvasSize = new Vector2(480f, 92f);
     [SerializeField] private Vector2 slotSize = new Vector2(92f, 78f);
     [SerializeField] private float slotGap = 16f;
