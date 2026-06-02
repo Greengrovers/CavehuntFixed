@@ -16,6 +16,7 @@ public class ProceduralGameAudio : MonoBehaviour
     private AudioClip pickupClip;
     private AudioClip bowReadyClip;
     private AudioClip arrowShotClip;
+    private AudioClip explosionClip;
     private AudioClip trapClip;
     private uint noiseSeed = 1;
 
@@ -47,6 +48,12 @@ public class ProceduralGameAudio : MonoBehaviour
     {
         ProceduralGameAudio audio = EnsureInstance();
         audio.PlayAt(position, audio.arrowShotClip ??= audio.CreateArrowShotClip(), 0.85f, 0.8f);
+    }
+
+    public static void PlayExplosion(Vector3 position)
+    {
+        ProceduralGameAudio audio = EnsureInstance();
+        audio.PlayAt(position, audio.explosionClip ??= audio.CreateExplosionClip(), 1f, 0.95f);
     }
 
     public static void PlayTrap(Vector3 position)
@@ -203,6 +210,20 @@ public class ProceduralGameAudio : MonoBehaviour
         });
 
         return CreateClip("DMCA Free Arrow Shot", samples);
+    }
+
+    private AudioClip CreateExplosionClip()
+    {
+        float seconds = 0.82f;
+        float[] samples = CreateSamples(seconds, (time, progress) =>
+        {
+            float thump = Sine(time, Mathf.Lerp(82f, 32f, progress)) * Mathf.Exp(-progress * 8f) * 0.9f;
+            float crack = NextNoise() * Mathf.Exp(-progress * 16f) * 0.75f;
+            float rumble = NextNoise() * Mathf.Exp(-progress * 3.2f) * 0.32f;
+            return thump + crack + rumble;
+        });
+
+        return CreateClip("DMCA Free Grenade Explosion", samples);
     }
 
     private AudioClip CreateTrapClip()

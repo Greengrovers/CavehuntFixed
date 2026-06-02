@@ -20,6 +20,9 @@ public class Arrow : MonoBehaviour
     private bool hasPreviousPosition;
     private Vector3 previousPosition;
     private AmmoType ammoType = AmmoType.Normal;
+    private ArrowAmmoVfx ammoVfx;
+
+    public float GrenadeExplosionRadius => Mathf.Max(0.01f, grenadeExplosionRadius);
 
     private void Awake()
     {
@@ -40,6 +43,10 @@ public class Arrow : MonoBehaviour
         hasBeenShot = false;
         hasResolvedHit = false;
         hasPreviousPosition = false;
+        if (ammoVfx != null)
+        {
+            ammoVfx.PrepareForNockedArrow();
+        }
 
         if (ownColliders != null)
         {
@@ -65,6 +72,10 @@ public class Arrow : MonoBehaviour
     public void SetAmmoType(AmmoType newAmmoType)
     {
         ammoType = newAmmoType;
+        if (ammoVfx != null)
+        {
+            ammoVfx.SetAmmoType(ammoType);
+        }
     }
 
     public void Shoot(Vector3 direction, float force)
@@ -74,6 +85,10 @@ public class Arrow : MonoBehaviour
         CacheComponents();
         hasBeenShot = true;
         hasResolvedHit = false;
+        if (ammoVfx != null)
+        {
+            ammoVfx.PlayShot();
+        }
 
         transform.parent = null;
 
@@ -119,6 +134,15 @@ public class Arrow : MonoBehaviour
         if (ownColliders == null || ownColliders.Length == 0)
         {
             ownColliders = GetComponentsInChildren<Collider>(true);
+        }
+
+        if (ammoVfx == null)
+        {
+            ammoVfx = GetComponent<ArrowAmmoVfx>();
+            if (ammoVfx == null)
+            {
+                ammoVfx = gameObject.AddComponent<ArrowAmmoVfx>();
+            }
         }
     }
 
@@ -231,16 +255,39 @@ public class Arrow : MonoBehaviour
         {
             hasResolvedHit = true;
             transform.position = hitPoint;
+            if (ammoVfx != null)
+            {
+                ammoVfx.PlayImpact(ammoType, hitPoint, grenadeExplosionRadius);
+            }
             Explode(damageable);
             Destroy(gameObject);
             return;
         }
 
-        if (damageable == null) return;
+        if (damageable == null)
+        {
+            if (ammoType != AmmoType.Normal)
+            {
+                hasResolvedHit = true;
+                transform.position = hitPoint;
+                if (ammoVfx != null)
+                {
+                    ammoVfx.PlayImpact(ammoType, hitPoint, grenadeExplosionRadius);
+                }
+
+                Destroy(gameObject);
+            }
+
+            return;
+        }
 
         hasResolvedHit = true;
         transform.position = hitPoint;
         damageable.TakeDamage(damage);
+        if (ammoVfx != null)
+        {
+            ammoVfx.PlayImpact(ammoType, hitPoint, grenadeExplosionRadius);
+        }
 
         if (ammoType == AmmoType.Fire)
         {

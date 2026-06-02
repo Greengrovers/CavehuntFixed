@@ -47,6 +47,18 @@ public class PlayerHealth : MonoBehaviour
         }
     }
 
+    public float Heal(float amount)
+    {
+        if (amount <= 0f || currentHealth <= 0f || currentHealth >= maxHealth) return 0f;
+
+        float previousHealth = currentHealth;
+        currentHealth = Mathf.Min(maxHealth, currentHealth + amount);
+        float healed = currentHealth - previousHealth;
+        Debug.Log($"Player healed: {currentHealth}/{maxHealth}");
+        return healed;
+    }
+
+
     private IEnumerator ResetHealthAfterDelay()
     {
         yield return new WaitForSeconds(Mathf.Max(0.05f, deathRespawnDelay));

@@ -2358,6 +2358,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1556786598}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!134 &1020715746
+PhysicsMaterial:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ' (Instance) (Instance) (Instance) (Instance)'
+  serializedVersion: 2
+  m_DynamicFriction: 0.6
+  m_StaticFriction: 0.6
+  m_Bounciness: 0
+  m_FrictionCombine: 0
+  m_BounceCombine: 0
 --- !u!134 &1034123834
 PhysicsMaterial:
   m_ObjectHideFlags: 0
@@ -2823,7 +2836,7 @@ MonoBehaviour:
   spawnPointParent: {fileID: 969306568}
   spawnPointParentName: Bat Outer Ring Spawn Points
   bulletMaterial: {fileID: 0}
-  spawnAutomatically: 0
+  spawnAutomatically: 1
   spawnInterval: 3
   maxActiveBats: 0
   spawnedBatNamePrefix: Bat Outer Ring
@@ -3022,19 +3035,6 @@ Transform:
   - {fileID: 1964602098}
   m_Father: {fileID: 70656603}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!134 &1357129319
-PhysicsMaterial:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: ' (Instance) (Instance) (Instance) (Instance) (Instance)'
-  serializedVersion: 2
-  m_DynamicFriction: 0.6
-  m_StaticFriction: 0.6
-  m_Bounciness: 0
-  m_FrictionCombine: 0
-  m_BounceCombine: 0
 --- !u!1 &1357446838
 GameObject:
   m_ObjectHideFlags: 0
@@ -3766,7 +3766,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5531238d3c438a429efcadb94e65d84, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Damageable
-  maxHealth: 3
+  maxHealth: 1
   deactivateOnDeath: 1
   onDeath:
     m_PersistentCalls:
@@ -4837,7 +4837,7 @@ MeshCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1806798296}
-  m_Material: {fileID: 1357129319}
+  m_Material: {fileID: 1020715746}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -4957,7 +4957,6 @@ MonoBehaviour:
   promptColor: {r: 1, g: 1, b: 1, a: 1}
   hidePromptOnBowPickup: 1
   startEnemiesOnBowPickup: 1
-  additionalEnemySpawners: []
 --- !u!114 &1806798304
 MonoBehaviour:
   m_ObjectHideFlags: 0

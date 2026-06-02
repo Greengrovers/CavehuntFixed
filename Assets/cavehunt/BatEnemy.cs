@@ -24,6 +24,7 @@ public class BatEnemy : MonoBehaviour
     [SerializeField] private bool facePlayerOnSpawn = true;
     [SerializeField, Range(-180f, 180f)] private float facePlayerYawOffsetDegrees = 0f;
     [SerializeField] private Vector2 firstShotDelayMultiplierRange = new Vector2(0.35f, 0.75f);
+    [SerializeField] private bool waitForBowPickup = true;
 
     [Header("Shooting")]
     [SerializeField] private float shootInterval = 1.5f;
@@ -47,8 +48,10 @@ public class BatEnemy : MonoBehaviour
     private PlayerHealth playerHealth;
     private EnemyPickupDropper pickupDropper;
     private int nextEyeSpawnIndex;
+    private bool encounterStarted;
+    private bool presentationStateCached;
 
-    public bool IsPresenting => !waitingForRespawn;
+    public bool IsPresenting => (!waitForBowPickup || encounterStarted) && !waitingForRespawn;
     public Transform BulletSpawnPoint => bulletSpawnPoint;
     public bool HasEyeBulletSpawnPoints => HasConfiguredEyeSpawnPoints();
 
@@ -92,6 +95,40 @@ public class BatEnemy : MonoBehaviour
         preferredSpawnIndex = spawnIndex;
     }
 
+    public void BeginEncounter()
+    {
+        if (encounterStarted) return;
+
+        encounterStarted = true;
+        waitingForRespawn = false;
+        CancelInvoke(nameof(Respawn));
+        CachePresentationComponents();
+        CollectEyeBulletSpawnPointsIfNeeded();
+
+        if (playerTarget == null && Camera.main != null)
+        {
+            playerTarget = Camera.main.transform;
+        }
+
+        if (bulletSpawnPoint == null)
+        {
+            bulletSpawnPoint = HasConfiguredEyeSpawnPoints() ? eyeBulletSpawnPoints[0] : transform;
+        }
+
+        if (playerHealth == null)
+        {
+            playerHealth = ResolvePlayerHealth();
+        }
+
+        if (damageable != null)
+        {
+            damageable.ResetHealth();
+        }
+
+        SpawnAtCeilingPoint();
+        SetPresentationActive(true);
+    }
+
     private void Awake()
     {
         PrepareDamageable();
@@ -133,13 +170,21 @@ public class BatEnemy : MonoBehaviour
             playerHealth = ResolvePlayerHealth();
         }
 
-        SpawnAtCeilingPoint();
-        SetPresentationActive(true);
+        if (waitForBowPickup && !encounterStarted)
+        {
+            SetPresentationActive(false);
+            return;
+        }
+
+        if (!encounterStarted)
+        {
+            BeginEncounter();
+        }
     }
 
     private void Update()
     {
-        if (waitingForRespawn || !gameObject.activeInHierarchy) return;
+        if ((waitForBowPickup && !encounterStarted) || waitingForRespawn || !gameObject.activeInHierarchy) return;
 
         RotateTowardPlayer();
         MoveTowardGround();
@@ -302,6 +347,8 @@ public class BatEnemy : MonoBehaviour
 
     private void CachePresentationComponents()
     {
+        if (presentationStateCached && cachedRenderers != null && cachedColliders != null) return;
+
         cachedRenderers = GetComponentsInChildren<Renderer>(true);
         cachedColliders = GetComponentsInChildren<Collider>(true);
         initialRendererStates = new bool[cachedRenderers.Length];
@@ -316,6 +363,8 @@ public class BatEnemy : MonoBehaviour
         {
             initialColliderStates[i] = cachedColliders[i].enabled;
         }
+
+        presentationStateCached = true;
     }
 
     private void SetPresentationActive(bool active)

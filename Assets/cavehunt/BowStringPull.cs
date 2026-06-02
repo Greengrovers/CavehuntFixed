@@ -114,9 +114,10 @@ public class BowStringPull : MonoBehaviour
 
     public void EndPull(SelectExitEventArgs args)
     {
-        if (shotArmed)
+        float shotPullAmount = pullAmount;
+        if (shotPullAmount > 0.001f)
         {
-            Shoot();
+            Shoot(shotPullAmount);
         }
 
         pullingInteractor = null;
@@ -326,11 +327,10 @@ public class BowStringPull : MonoBehaviour
         ResetString();
     }
 
-    private void Shoot()
+    private void Shoot(float shotPullAmount)
     {
         if (arrowSpawner == null) return;
 
-        float shotPullAmount = shotArmed ? GetTriggerPullAmount() : pullAmount;
         float force = Mathf.Max(0.01f, shotPullAmount) * shootForceMultiplier;
         arrowSpawner.ShootCurrentArrow(force);
     }

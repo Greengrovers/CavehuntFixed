@@ -120,9 +120,8 @@ public static class BatEncounterBootstrap
         if (pickupDropper == null)
         {
             pickupDropper = bat.AddComponent<EnemyPickupDropper>();
+            pickupDropper.Configure(0.25f);
         }
-
-        pickupDropper.Configure(0.25f);
     }
 
     private static Transform FindPlayerTarget()

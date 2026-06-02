@@ -32,13 +32,30 @@ public class EnemyPickupDropper : MonoBehaviour
     [SerializeField] private float trapSpawnLift = 0f;
     [SerializeField] private float trapDamage = 1f;
 
+    [Header("Healing Geode")]
+    [SerializeField, Range(0f, 1f)] private float healingGeodeSpawnChance = 0.25f;
+    [SerializeField] private GameObject healingGeodeTemplate;
+    [SerializeField] private string healingGeodeResourcePath = "Geodes/HealingGeode";
+    [SerializeField] private float healingGeodePlayerSpacing = 4f;
+    [SerializeField] private float healingGeodePickupSpacing = 3f;
+    [SerializeField] private float healingGeodeSpawnLift = 0f;
+
     private Transform cachedPlayerTarget;
     private GameObject cachedSpikeTrapTemplate;
+    private GameObject cachedHealingGeodeTemplate;
 
     private void Awake()
     {
         EnsurePickupPrefabs();
         ResolveSpikeTrapTemplate();
+        ResolveHealingGeodeTemplate();
+    }
+
+    private void OnValidate()
+    {
+        dropChance = Mathf.Clamp01(dropChance);
+        trapSpawnChance = Mathf.Clamp01(trapSpawnChance);
+        healingGeodeSpawnChance = Mathf.Clamp01(healingGeodeSpawnChance);
     }
 
     public void Configure(float chance, GameObject[] prefabs = null)
@@ -52,6 +69,19 @@ public class EnemyPickupDropper : MonoBehaviour
 
         EnsurePickupPrefabs();
     }
+
+    public float HealingGeodeSpawnChance
+    {
+        get => healingGeodeSpawnChance;
+        set => healingGeodeSpawnChance = Mathf.Clamp01(value);
+    }
+
+    public float HealingGeodeSpawnChancePercent
+    {
+        get => healingGeodeSpawnChance * 100f;
+        set => HealingGeodeSpawnChance = value / 100f;
+    }
+
 
     public GameObject TryDrop(Vector3 enemyPosition)
     {
@@ -83,6 +113,7 @@ public class EnemyPickupDropper : MonoBehaviour
 
         AttachPickupArrow(pickup);
         TrySpawnTrapBetweenPlayerAndPickup(spawnPosition);
+        TrySpawnHealingGeodeBetweenPlayerAndPickup(spawnPosition);
 
         return pickup;
     }
@@ -198,6 +229,7 @@ public class EnemyPickupDropper : MonoBehaviour
         if (candidate.GetComponentInParent<PlayerHealth>() != null) return false;
         if (candidate.GetComponentInParent<AmmoPickup>() != null) return false;
         if (candidate.GetComponentInParent<SpikeTrap>() != null) return false;
+        if (candidate.GetComponentInParent<HealingGeode>() != null) return false;
 
         return true;
     }
@@ -252,6 +284,42 @@ public class EnemyPickupDropper : MonoBehaviour
         trap.Configure(trapDamage);
     }
 
+    private void TrySpawnHealingGeodeBetweenPlayerAndPickup(Vector3 pickupPosition)
+    {
+        if (healingGeodeSpawnChance <= 0f || Random.value > healingGeodeSpawnChance) return;
+
+        Transform playerTarget = ResolvePlayerTarget();
+        GameObject template = ResolveHealingGeodeTemplate();
+        if (playerTarget == null || template == null) return;
+
+        Vector3 playerPosition = playerTarget.position;
+        Vector3 toPickup = pickupPosition - playerPosition;
+        toPickup.y = 0f;
+
+        float distance = toPickup.magnitude;
+        if (distance < 1f) return;
+
+        Vector3 direction = toPickup / distance;
+        float lower = Mathf.Clamp01(healingGeodePlayerSpacing / distance);
+        float upper = Mathf.Clamp01(1f - healingGeodePickupSpacing / distance);
+        float t = lower < upper ? Random.Range(lower, upper) : 0.5f;
+
+        Vector3 geodeHorizontalPosition = playerPosition + direction * (distance * t);
+        geodeHorizontalPosition.y = pickupPosition.y;
+        Vector3 geodePosition = ResolveGroundDropPosition(geodeHorizontalPosition, Vector2.zero, 0f) + Vector3.up * Mathf.Max(0f, healingGeodeSpawnLift);
+        Quaternion geodeRotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+
+        GameObject geodeObject = Instantiate(template, geodePosition, geodeRotation);
+        geodeObject.name = "Geode Boundary Healing";
+        geodeObject.SetActive(true);
+
+        HealingGeode healingGeode = geodeObject.GetComponent<HealingGeode>();
+        if (healingGeode == null)
+        {
+            Debug.LogWarning("Healing geode template has no HealingGeode component. Inspector healing values were not applied.", geodeObject);
+        }
+    }
+
     private GameObject ResolveSpikeTrapTemplate()
     {
         if (spikeTrapTemplate != null) return spikeTrapTemplate;
@@ -281,6 +349,19 @@ public class EnemyPickupDropper : MonoBehaviour
         return cachedSpikeTrapTemplate;
     }
 
+
+    private GameObject ResolveHealingGeodeTemplate()
+    {
+        if (healingGeodeTemplate != null) return healingGeodeTemplate;
+        if (cachedHealingGeodeTemplate != null) return cachedHealingGeodeTemplate;
+
+        if (!string.IsNullOrEmpty(healingGeodeResourcePath))
+        {
+            cachedHealingGeodeTemplate = Resources.Load<GameObject>(healingGeodeResourcePath);
+        }
+
+        return cachedHealingGeodeTemplate;
+    }
     private GameObject CreateSpikeTrapTemplate(GameObject source)
     {
         GameObject template = Instantiate(source);
