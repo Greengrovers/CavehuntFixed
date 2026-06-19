@@ -28,6 +28,8 @@ public class PlayerBowHealthBar : MonoBehaviour
     private Material bowHealthMaterial;
     private bool hasOriginalBowState;
     private bool isBowHeld;
+    private bool warnedMissingSegmentShader;
+    private Texture2D screenBarTexture;
 
     private void Awake()
     {
@@ -72,41 +74,29 @@ public class PlayerBowHealthBar : MonoBehaviour
         ApplyVisualState();
     }
 
-    private void OnGUI()
-    {
-        if (!showScreenBarWhenBowNotHeld || isBowHeld || playerHealth == null) return;
-        if (screenBarNormalizedRect.width <= 0f || screenBarNormalizedRect.height <= 0f) return;
-
-        float healthFraction = GetHealthFraction();
-        Rect backgroundRect = new Rect(
-            Screen.width * screenBarNormalizedRect.x,
-            Screen.height * screenBarNormalizedRect.y,
-            Screen.width * screenBarNormalizedRect.width,
-            Screen.height * screenBarNormalizedRect.height
-        );
-
-        float fillHeight = backgroundRect.height * healthFraction;
-        Rect fillRect = new Rect(
-            backgroundRect.x,
-            backgroundRect.y + backgroundRect.height - fillHeight,
-            backgroundRect.width,
-            fillHeight
-        );
-
-        Color previousColor = GUI.color;
-        GUI.color = screenBarBackgroundColor;
-        GUI.DrawTexture(backgroundRect, Texture2D.whiteTexture);
-        GUI.color = screenBarFillColor;
-        GUI.DrawTexture(fillRect, Texture2D.whiteTexture);
-        GUI.color = previousColor;
-    }
-
     private void OnValidate()
     {
         screenBarNormalizedRect.x = Mathf.Clamp01(screenBarNormalizedRect.x);
         screenBarNormalizedRect.y = Mathf.Clamp01(screenBarNormalizedRect.y);
         screenBarNormalizedRect.width = Mathf.Clamp01(screenBarNormalizedRect.width);
         screenBarNormalizedRect.height = Mathf.Clamp01(screenBarNormalizedRect.height);
+    }
+
+    private void OnGUI()
+    {
+        if (!ShouldDrawScreenBar()) return;
+
+        Rect barRect = GetScreenBarRect();
+        GUI.color = screenBarBackgroundColor;
+        GUI.DrawTexture(barRect, GetScreenBarTexture());
+
+        float healthFraction = GetHealthFraction();
+        Rect fillRect = barRect;
+        fillRect.yMin = fillRect.yMax - fillRect.height * healthFraction;
+
+        GUI.color = screenBarFillColor;
+        GUI.DrawTexture(fillRect, GetScreenBarTexture());
+        GUI.color = Color.white;
     }
 
     private void OnBowSelected(SelectEnterEventArgs args)
@@ -139,7 +129,44 @@ public class PlayerBowHealthBar : MonoBehaviour
             }
         }
 
+        if (bowHealthRenderer == null)
+        {
+            bowHealthRenderer = ResolveFallbackBowRenderer();
+        }
+
         CacheOriginalBowState();
+    }
+
+    private Renderer ResolveFallbackBowRenderer()
+    {
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null) continue;
+
+            string lowerName = renderer.name.ToLowerInvariant();
+            if (lowerName.Contains("bogen") || lowerName.Contains("bow"))
+            {
+                return renderer;
+            }
+        }
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null) continue;
+
+            string lowerName = renderer.name.ToLowerInvariant();
+            if (lowerName.Contains("string") || lowerName.Contains("arrow") || lowerName.Contains("health") || lowerName.Contains("prompt"))
+            {
+                continue;
+            }
+
+            return renderer;
+        }
+
+        return null;
     }
 
     private void ResolveGrabInteractable()
@@ -170,6 +197,34 @@ public class PlayerBowHealthBar : MonoBehaviour
         {
             RestoreBowVisual();
         }
+    }
+
+    private bool ShouldDrawScreenBar()
+    {
+        if (!showScreenBarWhenBowNotHeld || isBowHeld) return false;
+        if (playerHealth == null || playerHealth.MaxHealth <= 0f || playerHealth.IsDead) return false;
+
+        return playerHealth.CurrentHealth < playerHealth.MaxHealth;
+    }
+
+    private Rect GetScreenBarRect()
+    {
+        return new Rect(
+            screenBarNormalizedRect.x * Screen.width,
+            screenBarNormalizedRect.y * Screen.height,
+            screenBarNormalizedRect.width * Screen.width,
+            screenBarNormalizedRect.height * Screen.height
+        );
+    }
+
+    private Texture2D GetScreenBarTexture()
+    {
+        if (screenBarTexture == null)
+        {
+            screenBarTexture = Texture2D.whiteTexture;
+        }
+
+        return screenBarTexture;
     }
 
     private void ApplyBowHealthVisual()
@@ -204,6 +259,15 @@ public class PlayerBowHealthBar : MonoBehaviour
             return bowHealthMaterial;
         }
 
+        Material template = Resources.Load<Material>("BowHealthBarRuntime");
+        if (template != null)
+        {
+            bowHealthMaterial = new Material(template);
+            bowHealthMaterial.name = "Runtime Bow Health Material";
+            bowHealthMaterial.hideFlags = HideFlags.DontSave;
+            return bowHealthMaterial;
+        }
+
         Shader shader = Shader.Find("Cavehunt/BowHealthBar");
         if (shader == null)
         {
@@ -219,6 +283,11 @@ public class PlayerBowHealthBar : MonoBehaviour
         }
 
         bowHealthMaterial = new Material(shader);
+        if (!bowHealthMaterial.HasProperty("_MissingSegmentCount") && !warnedMissingSegmentShader)
+        {
+            warnedMissingSegmentShader = true;
+            Debug.LogWarning("Bow health shader is missing segment properties. Check Always Included Shaders for Cavehunt/BowHealthBar.");
+        }
         bowHealthMaterial.name = "Runtime Bow Health Material";
         bowHealthMaterial.hideFlags = HideFlags.DontSave;
         return bowHealthMaterial;
@@ -232,6 +301,8 @@ public class PlayerBowHealthBar : MonoBehaviour
         SetMaterialColor(material, "_HealthColor", bowHealthColor);
         SetMaterialColor(material, "_MissingHealthColor", missingHealthColor);
         SetMaterialFloat(material, "_HealthFraction", healthFraction);
+        SetMaterialFloat(material, "_SegmentCount", GetHealthSegmentCount());
+        SetMaterialFloat(material, "_MissingSegmentCount", GetMissingHealthSegmentCount());
 
         Vector3 axis = bowHealthAxis.sqrMagnitude > 0.0001f ? bowHealthAxis.normalized : Vector3.up;
         Bounds localBounds = bowHealthRenderer.localBounds;
@@ -254,6 +325,22 @@ public class PlayerBowHealthBar : MonoBehaviour
         return Mathf.Clamp01(playerHealth.CurrentHealth / playerHealth.MaxHealth);
     }
 
+    private float GetHealthSegmentCount()
+    {
+        if (playerHealth == null || playerHealth.MaxHealth <= 0f) return 1f;
+
+        return Mathf.Max(1f, Mathf.Round(playerHealth.MaxHealth));
+    }
+    private float GetMissingHealthSegmentCount()
+    {
+        if (playerHealth == null || playerHealth.MaxHealth <= 0f) return 0f;
+
+        return Mathf.Clamp(
+            Mathf.Ceil(playerHealth.MaxHealth - playerHealth.CurrentHealth),
+            0f,
+            GetHealthSegmentCount()
+        );
+    }
     private static void SetMaterialColor(Material material, Color color)
     {
         if (material == null) return;

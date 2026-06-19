@@ -17,10 +17,12 @@ Shader "Cavehunt/GroundFogVertexColor"
             "Queue" = "Transparent"
             "RenderType" = "Transparent"
             "RenderPipeline" = "UniversalPipeline"
+            "DisableBatching" = "True"
         }
 
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
+        ZTest LEqual
         Cull Off
         Lighting Off
 
@@ -32,6 +34,8 @@ Shader "Cavehunt/GroundFogVertexColor"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile_instancing
+            #pragma multi_compile _ STEREO_INSTANCING_ON STEREO_MULTIVIEW_ON UNITY_SINGLE_PASS_STEREO
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
@@ -50,17 +54,21 @@ Shader "Cavehunt/GroundFogVertexColor"
             struct Attributes
             {
                 float4 positionOS : POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct Varyings
             {
                 float4 positionHCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
             Varyings vert(Attributes input)
             {
-                Varyings output;
+                Varyings output = (Varyings)0;
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
                 output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
                 output.positionHCS = TransformWorldToHClip(output.positionWS);
                 return output;
@@ -74,6 +82,8 @@ Shader "Cavehunt/GroundFogVertexColor"
 
             half4 frag(Varyings input) : SV_Target
             {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
+
                 float2 position = input.positionWS.xz;
                 half reveal = 0;
 
@@ -107,10 +117,12 @@ Shader "Cavehunt/GroundFogVertexColor"
         {
             "Queue" = "Transparent"
             "RenderType" = "Transparent"
+            "DisableBatching" = "True"
         }
 
         Blend SrcAlpha OneMinusSrcAlpha
         ZWrite Off
+        ZTest LEqual
         Cull Off
         Lighting Off
 
@@ -119,6 +131,8 @@ Shader "Cavehunt/GroundFogVertexColor"
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            #pragma multi_compile_instancing
+            #pragma multi_compile _ STEREO_INSTANCING_ON STEREO_MULTIVIEW_ON UNITY_SINGLE_PASS_STEREO
             #include "UnityCG.cginc"
 
             fixed4 _FogColor;
@@ -133,17 +147,21 @@ Shader "Cavehunt/GroundFogVertexColor"
             struct appdata
             {
                 float4 vertex : POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
             };
 
             struct v2f
             {
                 float4 vertex : SV_POSITION;
                 float3 worldPos : TEXCOORD0;
+                UNITY_VERTEX_OUTPUT_STEREO
             };
 
             v2f vert(appdata v)
             {
-                v2f o;
+                v2f o = (v2f)0;
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
                 o.worldPos = mul(unity_ObjectToWorld, v.vertex).xyz;
                 o.vertex = UnityObjectToClipPos(v.vertex);
                 return o;
@@ -157,6 +175,8 @@ Shader "Cavehunt/GroundFogVertexColor"
 
             fixed4 frag(v2f i) : SV_Target
             {
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+
                 float2 position = i.worldPos.xz;
                 fixed reveal = 0;
 

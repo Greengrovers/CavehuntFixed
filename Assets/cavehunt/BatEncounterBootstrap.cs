@@ -126,7 +126,8 @@ public static class BatEncounterBootstrap
 
     private static Transform FindPlayerTarget()
     {
-        if (Camera.main != null) return Camera.main.transform;
+        Camera camera = VrCameraResolver.GetCamera();
+        if (camera != null) return camera.transform;
 
         GameObject xrOrigin = GameObject.Find("XR Origin (XR Rig)") ?? GameObject.Find("XR Origin (VR)");
         if (xrOrigin != null) return xrOrigin.transform;

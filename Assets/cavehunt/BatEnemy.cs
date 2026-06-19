@@ -105,9 +105,13 @@ public class BatEnemy : MonoBehaviour
         CachePresentationComponents();
         CollectEyeBulletSpawnPointsIfNeeded();
 
-        if (playerTarget == null && Camera.main != null)
+        if (playerTarget == null)
         {
-            playerTarget = Camera.main.transform;
+            Camera camera = VrCameraResolver.GetCamera();
+            if (camera != null)
+            {
+                playerTarget = camera.transform;
+            }
         }
 
         if (bulletSpawnPoint == null)
@@ -129,6 +133,22 @@ public class BatEnemy : MonoBehaviour
         SetPresentationActive(true);
     }
 
+    public void ResetForBowPickup()
+    {
+        encounterStarted = false;
+        waitingForRespawn = false;
+        CancelInvoke(nameof(Respawn));
+        PrepareDamageable();
+
+        if (damageable != null)
+        {
+            damageable.ResetHealth();
+        }
+
+        gameObject.SetActive(true);
+        CachePresentationComponents();
+        SetPresentationActive(false);
+    }
     private void Awake()
     {
         PrepareDamageable();
@@ -155,9 +175,13 @@ public class BatEnemy : MonoBehaviour
         CachePresentationComponents();
         CollectEyeBulletSpawnPointsIfNeeded();
 
-        if (playerTarget == null && Camera.main != null)
+        if (playerTarget == null)
         {
-            playerTarget = Camera.main.transform;
+            Camera camera = VrCameraResolver.GetCamera();
+            if (camera != null)
+            {
+                playerTarget = camera.transform;
+            }
         }
 
         if (bulletSpawnPoint == null)

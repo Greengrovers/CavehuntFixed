@@ -6,6 +6,10 @@ public class ArrowAmmoVfx : MonoBehaviour
     [Header("Placement")]
     [SerializeField] private float tipOffsetScale = 0.55f;
 
+    [Header("Normal")]
+    [SerializeField] private Color normalCoreColor = new Color(1f, 0.95f, 0.72f, 0.82f);
+    [SerializeField] private Color normalEdgeColor = new Color(1f, 1f, 1f, 0.04f);
+
     [Header("Fire")]
     [SerializeField] private Color fireCoreColor = new Color(1f, 0.58f, 0.08f, 1f);
     [SerializeField] private Color fireEdgeColor = new Color(1f, 0.06f, 0.01f, 0.18f);
@@ -54,15 +58,13 @@ public class ArrowAmmoVfx : MonoBehaviour
         EnsureVisuals();
         ApplyVisualState();
 
-        if (ammoType == AmmoType.Normal) return;
-
         if (flightTrail != null)
         {
             flightTrail.Clear();
             flightTrail.emitting = true;
         }
 
-        if (flightParticles != null)
+        if (flightParticles != null && ammoType != AmmoType.Normal)
         {
             flightParticles.Play(true);
         }
@@ -70,8 +72,6 @@ public class ArrowAmmoVfx : MonoBehaviour
 
     public void PlayImpact(AmmoType impactAmmoType, Vector3 position, float explosionRadius)
     {
-        if (impactAmmoType == AmmoType.Normal) return;
-
         Color coreColor;
         Color edgeColor;
         ResolveColors(impactAmmoType, out coreColor, out edgeColor);
@@ -84,12 +84,12 @@ public class ArrowAmmoVfx : MonoBehaviour
             burst,
             coreColor,
             edgeColor,
-            impactAmmoType == AmmoType.Grenade ? 0.18f : 0.08f,
-            impactAmmoType == AmmoType.Grenade ? 7.5f : 3.2f,
+            impactAmmoType == AmmoType.Grenade ? 0.18f : impactAmmoType == AmmoType.Normal ? 0.045f : 0.08f,
+            impactAmmoType == AmmoType.Grenade ? 7.5f : impactAmmoType == AmmoType.Normal ? 1.6f : 3.2f,
             false,
             ParticleSystemSimulationSpace.World,
             ParticleSystemShapeType.Sphere,
-            impactAmmoType == AmmoType.Grenade ? 90 : 28);
+            impactAmmoType == AmmoType.Grenade ? 90 : impactAmmoType == AmmoType.Normal ? 14 : 28);
 
         ParticleSystemRenderer burstRenderer = burst.GetComponent<ParticleSystemRenderer>();
         burstRenderer.material = ResolveParticleMaterial();
@@ -109,8 +109,12 @@ public class ArrowAmmoVfx : MonoBehaviour
         {
             CreateShockwave(impactObject.transform, 0.85f, fireCoreColor, 0.25f);
         }
+        else if (impactAmmoType == AmmoType.Normal)
+        {
+            CreateShockwave(impactObject.transform, 0.45f, normalCoreColor, 0.18f);
+        }
 
-        Destroy(impactObject, impactAmmoType == AmmoType.Grenade ? 3.5f : 1.6f);
+        Destroy(impactObject, impactAmmoType == AmmoType.Grenade ? 3.5f : impactAmmoType == AmmoType.Normal ? 0.9f : 1.6f);
     }
 
     private void EnsureVisuals()
@@ -182,6 +186,7 @@ public class ArrowAmmoVfx : MonoBehaviour
     private void ApplyVisualState()
     {
         bool showAmmoVfx = ammoType != AmmoType.Normal;
+        bool showNormalFlightFeedback = ammoType == AmmoType.Normal && hasBeenShot;
         Color coreColor;
         Color edgeColor;
         ResolveColors(ammoType, out coreColor, out edgeColor);
@@ -224,12 +229,9 @@ public class ArrowAmmoVfx : MonoBehaviour
         {
             flightTrail.startColor = coreColor;
             flightTrail.endColor = edgeColor;
-            flightTrail.startWidth = ammoType == AmmoType.Grenade ? 0.22f : ammoType == AmmoType.Fire ? 0.18f : 0.13f;
-            flightTrail.time = ammoType == AmmoType.Air ? 0.48f : 0.36f;
-            if (!showAmmoVfx || !hasBeenShot)
-            {
-                flightTrail.emitting = false;
-            }
+            flightTrail.startWidth = ammoType == AmmoType.Grenade ? 0.22f : ammoType == AmmoType.Fire ? 0.18f : ammoType == AmmoType.Normal ? 0.055f : 0.13f;
+            flightTrail.time = ammoType == AmmoType.Air ? 0.48f : ammoType == AmmoType.Normal ? 0.22f : 0.36f;
+            flightTrail.emitting = hasBeenShot && (showAmmoVfx || showNormalFlightFeedback);
         }
 
         if (ammoLight != null)
@@ -378,8 +380,8 @@ public class ArrowAmmoVfx : MonoBehaviour
                 edgeColor = grenadeEdgeColor;
                 break;
             default:
-                coreColor = Color.white;
-                edgeColor = new Color(1f, 1f, 1f, 0f);
+                coreColor = normalCoreColor;
+                edgeColor = normalEdgeColor;
                 break;
         }
     }

@@ -54,6 +54,22 @@ public class BatOuterRingSpawner : MonoBehaviour
         CancelInvoke(nameof(SpawnBat));
     }
 
+    public void ResetForBowPickup()
+    {
+        StopSpawning();
+
+        for (int i = transform.childCount - 1; i >= 0; i--)
+        {
+            Transform child = transform.GetChild(i);
+            if (child != null && child.GetComponent<BatEnemy>() != null)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+
+        spawnedCount = 0;
+        gameObject.SetActive(false);
+    }
     public void SpawnBat()
     {
         ResolveReferences();
@@ -157,7 +173,8 @@ public class BatOuterRingSpawner : MonoBehaviour
     {
         if (playerTarget == null)
         {
-            playerTarget = Camera.main != null ? Camera.main.transform : ResolveXrOrigin();
+            Camera camera = VrCameraResolver.GetCamera();
+            playerTarget = camera != null ? camera.transform : ResolveXrOrigin();
         }
 
         if (playerHealth == null)

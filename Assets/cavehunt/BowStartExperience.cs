@@ -35,10 +35,20 @@ public class BowStartExperience : MonoBehaviour
     private bool encounterStarted;
     private bool yButtonWasPressed;
     private Camera cachedCamera;
+    private Transform initialParent;
+    private Vector3 initialLocalPosition;
+    private Quaternion initialLocalRotation;
+    private Vector3 initialLocalScale;
+    private Rigidbody bowRigidbody;
+    private bool initialRigidbodyIsKinematic;
+    private bool initialRigidbodyUseGravity;
+    private bool initialPoseCached;
 
     private void Awake()
     {
         grabInteractable = GetComponent<XRGrabInteractable>();
+        bowRigidbody = GetComponent<Rigidbody>();
+        CacheInitialState();
     }
 
     private void OnEnable()
@@ -48,6 +58,12 @@ public class BowStartExperience : MonoBehaviour
             grabInteractable = GetComponent<XRGrabInteractable>();
         }
 
+        if (bowRigidbody == null)
+        {
+            bowRigidbody = GetComponent<Rigidbody>();
+        }
+
+        CacheInitialState();
         grabInteractable.selectEntered.AddListener(OnBowSelected);
     }
 
@@ -233,11 +249,157 @@ public class BowStartExperience : MonoBehaviour
         return FindObjectsByType<BatOuterRingSpawner>(FindObjectsInactive.Include);
     }
 
+    public void HideForPlayerDeath()
+    {
+        CacheInitialState();
+        encounterStarted = false;
+        DismissPrompt();
+        RemovePickupArrow();
+        StopEnemiesUntilBowPickup();
+
+        if (bowRigidbody != null)
+        {
+            bowRigidbody.linearVelocity = Vector3.zero;
+            bowRigidbody.angularVelocity = Vector3.zero;
+            bowRigidbody.isKinematic = true;
+        }
+
+        if (grabInteractable != null)
+        {
+            grabInteractable.enabled = false;
+        }
+
+        gameObject.SetActive(false);
+    }
+
+    public void ResetForRetry()
+    {
+        CacheInitialState();
+        StopEnemiesUntilBowPickup();
+
+        if (initialParent != null)
+        {
+            transform.SetParent(initialParent, false);
+        }
+
+        transform.localPosition = initialLocalPosition;
+        transform.localRotation = initialLocalRotation;
+        transform.localScale = initialLocalScale;
+
+        if (bowRigidbody == null)
+        {
+            bowRigidbody = GetComponent<Rigidbody>();
+        }
+
+        if (bowRigidbody != null)
+        {
+            bowRigidbody.linearVelocity = Vector3.zero;
+            bowRigidbody.angularVelocity = Vector3.zero;
+            bowRigidbody.isKinematic = initialRigidbodyIsKinematic;
+            bowRigidbody.useGravity = initialRigidbodyUseGravity;
+        }
+
+        encounterStarted = false;
+        gameObject.SetActive(true);
+
+        if (grabInteractable == null)
+        {
+            grabInteractable = GetComponent<XRGrabInteractable>();
+        }
+
+        if (grabInteractable != null)
+        {
+            grabInteractable.enabled = true;
+        }
+
+        AttachPickupArrow();
+        ResetPrompt();
+    }
+
+    public static void HideAllBowsForPlayerDeath()
+    {
+        BowStartExperience[] bows = FindObjectsByType<BowStartExperience>(FindObjectsInactive.Include);
+        for (int i = 0; i < bows.Length; i++)
+        {
+            if (bows[i] != null)
+            {
+                bows[i].HideForPlayerDeath();
+            }
+        }
+    }
+
+    public static void ResetAllBowsForRetry()
+    {
+        BowStartExperience[] bows = FindObjectsByType<BowStartExperience>(FindObjectsInactive.Include);
+        for (int i = 0; i < bows.Length; i++)
+        {
+            if (bows[i] != null)
+            {
+                bows[i].ResetForRetry();
+            }
+        }
+    }
+
+    private void CacheInitialState()
+    {
+        if (initialPoseCached) return;
+
+        initialParent = transform.parent;
+        initialLocalPosition = transform.localPosition;
+        initialLocalRotation = transform.localRotation;
+        initialLocalScale = transform.localScale;
+
+        if (bowRigidbody == null)
+        {
+            bowRigidbody = GetComponent<Rigidbody>();
+        }
+
+        if (bowRigidbody != null)
+        {
+            initialRigidbodyIsKinematic = bowRigidbody.isKinematic;
+            initialRigidbodyUseGravity = bowRigidbody.useGravity;
+        }
+
+        initialPoseCached = true;
+    }
+
+    private void ResetPrompt()
+    {
+        if (promptObject == null)
+        {
+            CreatePrompt();
+            return;
+        }
+
+        promptObject.SetActive(true);
+        PositionPrompt();
+    }
+
+    private static void StopEnemiesUntilBowPickup()
+    {
+        BatEnemy[] enemies = FindObjectsByType<BatEnemy>(FindObjectsInactive.Include);
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            if (enemies[i] != null)
+            {
+                enemies[i].ResetForBowPickup();
+            }
+        }
+
+        BatOuterRingSpawner[] spawners = FindObjectsByType<BatOuterRingSpawner>(FindObjectsInactive.Include);
+        for (int i = 0; i < spawners.Length; i++)
+        {
+            if (spawners[i] != null)
+            {
+                spawners[i].ResetForBowPickup();
+            }
+        }
+    }
     private Camera ResolveCamera()
     {
         if (cachedCamera == null)
         {
-            cachedCamera = Camera.main;
+            cachedCamera = VrCameraResolver.GetCamera();
         }
 
         return cachedCamera;

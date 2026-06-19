@@ -32,6 +32,8 @@ public class GroundFogController : MonoBehaviour
     [SerializeField] private LayerMask groundLayers = ~0;
     [SerializeField] private float fallbackGroundY = 0f;
     [SerializeField] private float fogHeightOffset = 0.08f;
+    [SerializeField, Min(0f)] private float fogVolumeHeight = 0f;
+    [SerializeField, Range(1, 16)] private int fogVerticalLayers = 6;
 
     [Header("Look")]
     [SerializeField] private Shader fogShader;
@@ -52,6 +54,9 @@ public class GroundFogController : MonoBehaviour
     private Material fogMaterial;
     private Vector2 lastCenter;
     private Vector2 lastSize;
+    private float lastFogHeightOffset;
+    private float lastFogVolumeHeight;
+    private int lastFogLayerCount;
         private float nextUpdateTime;
     private float nextReferenceRefreshTime;
 
@@ -115,6 +120,8 @@ public class GroundFogController : MonoBehaviour
         geodeClearRadius = Mathf.Max(0.1f, geodeClearRadius);
         baseAlpha = Mathf.Clamp01(baseAlpha);
         edgeSoftness = Mathf.Max(0.01f, edgeSoftness);
+        fogVolumeHeight = Mathf.Max(0f, fogVolumeHeight);
+        fogVerticalLayers = Mathf.Clamp(fogVerticalLayers, 1, 16);
     }
 
     private void EnsureReferences(bool force)
@@ -191,6 +198,7 @@ private void EnsureFogObjects()
             ConfigureMaterial(fogMaterial);
         }
 
+        meshRenderer.enabled = true;
         meshRenderer.sharedMaterial = fogMaterial;
         meshRenderer.shadowCastingMode = ShadowCastingMode.Off;
         meshRenderer.receiveShadows = false;
@@ -231,43 +239,63 @@ private void RebuildMeshIfNeeded(bool force)
         Vector2 center;
         Vector2 size;
         CalculateArea(out center, out size);
+        int fogLayerCount = GetFogLayerCount();
 
-        if (!force && fogMesh != null && lastCenter == center && lastSize == size)
+        if (!force &&
+            fogMesh != null &&
+            lastCenter == center &&
+            lastSize == size &&
+            Mathf.Approximately(lastFogHeightOffset, fogHeightOffset) &&
+            Mathf.Approximately(lastFogVolumeHeight, fogVolumeHeight) &&
+            lastFogLayerCount == fogLayerCount)
         {
             return;
         }
 
         lastCenter = center;
         lastSize = size;
+        lastFogHeightOffset = fogHeightOffset;
+        lastFogVolumeHeight = fogVolumeHeight;
+        lastFogLayerCount = fogLayerCount;
 
         float groundY = ResolveGroundY();
-        Vector3[] worldCorners =
-        {
-            new Vector3(center.x - size.x * 0.5f, groundY + fogHeightOffset, center.y - size.y * 0.5f),
-            new Vector3(center.x - size.x * 0.5f, groundY + fogHeightOffset, center.y + size.y * 0.5f),
-            new Vector3(center.x + size.x * 0.5f, groundY + fogHeightOffset, center.y - size.y * 0.5f),
-            new Vector3(center.x + size.x * 0.5f, groundY + fogHeightOffset, center.y + size.y * 0.5f)
-        };
+        float baseY = groundY + fogHeightOffset;
+        Vector3[] vertices = new Vector3[fogLayerCount * 4];
+        Vector2[] uvs = new Vector2[fogLayerCount * 4];
+        int[] triangles = new int[fogLayerCount * 6];
 
-        Vector3[] vertices = new Vector3[worldCorners.Length];
-        for (int i = 0; i < worldCorners.Length; i++)
+        for (int layer = 0; layer < fogLayerCount; layer++)
         {
-            vertices[i] = meshFilter.transform.InverseTransformPoint(worldCorners[i]);
+            float layerT = fogLayerCount == 1 ? 0f : layer / (float)(fogLayerCount - 1);
+            float layerY = baseY + fogVolumeHeight * layerT;
+            int vertexOffset = layer * 4;
+            int triangleOffset = layer * 6;
+
+            Vector3[] worldCorners =
+            {
+                new Vector3(center.x - size.x * 0.5f, layerY, center.y - size.y * 0.5f),
+                new Vector3(center.x - size.x * 0.5f, layerY, center.y + size.y * 0.5f),
+                new Vector3(center.x + size.x * 0.5f, layerY, center.y - size.y * 0.5f),
+                new Vector3(center.x + size.x * 0.5f, layerY, center.y + size.y * 0.5f)
+            };
+
+            for (int i = 0; i < worldCorners.Length; i++)
+            {
+                vertices[vertexOffset + i] = meshFilter.transform.InverseTransformPoint(worldCorners[i]);
+            }
+
+            uvs[vertexOffset + 0] = new Vector2(0f, 0f);
+            uvs[vertexOffset + 1] = new Vector2(0f, 1f);
+            uvs[vertexOffset + 2] = new Vector2(1f, 0f);
+            uvs[vertexOffset + 3] = new Vector2(1f, 1f);
+
+            triangles[triangleOffset + 0] = vertexOffset + 0;
+            triangles[triangleOffset + 1] = vertexOffset + 1;
+            triangles[triangleOffset + 2] = vertexOffset + 2;
+            triangles[triangleOffset + 3] = vertexOffset + 2;
+            triangles[triangleOffset + 4] = vertexOffset + 1;
+            triangles[triangleOffset + 5] = vertexOffset + 3;
         }
-
-        Vector2[] uvs =
-        {
-            new Vector2(0f, 0f),
-            new Vector2(0f, 1f),
-            new Vector2(1f, 0f),
-            new Vector2(1f, 1f)
-        };
-
-        int[] triangles =
-        {
-            0, 1, 2,
-            2, 1, 3
-        };
 
         if (fogMesh == null)
         {
@@ -287,6 +315,16 @@ private void RebuildMeshIfNeeded(bool force)
         fogMesh.RecalculateBounds();
         fogMesh.RecalculateNormals();
         meshFilter.sharedMesh = fogMesh;
+    }
+
+    private int GetFogLayerCount()
+    {
+        if (fogVolumeHeight <= 0.001f)
+        {
+            return 1;
+        }
+
+        return Mathf.Max(2, fogVerticalLayers);
     }
 
     private void CalculateArea(out Vector2 center, out Vector2 size)

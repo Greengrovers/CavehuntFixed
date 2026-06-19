@@ -266,18 +266,14 @@ public class Arrow : MonoBehaviour
 
         if (damageable == null)
         {
-            if (ammoType != AmmoType.Normal)
+            hasResolvedHit = true;
+            transform.position = hitPoint;
+            if (ammoVfx != null)
             {
-                hasResolvedHit = true;
-                transform.position = hitPoint;
-                if (ammoVfx != null)
-                {
-                    ammoVfx.PlayImpact(ammoType, hitPoint, grenadeExplosionRadius);
-                }
-
-                Destroy(gameObject);
+                ammoVfx.PlayImpact(ammoType, hitPoint, grenadeExplosionRadius);
             }
 
+            Destroy(gameObject);
             return;
         }
 
