@@ -16,6 +16,8 @@ public class BatEnemy : MonoBehaviour
     [SerializeField] private float groundY = 0.05f;
     [SerializeField] private float groundHitDamage = 1f;
     [SerializeField] private float respawnDelay = 2f;
+    [SerializeField] private bool descendTowardGround = true;
+    [SerializeField] private bool respawnOnDeath = true;
 
     [Header("Spawn")]
     [SerializeField] private float minPlayerSpawnDistance = 1.5f;
@@ -54,6 +56,7 @@ public class BatEnemy : MonoBehaviour
     public bool IsPresenting => (!waitForBowPickup || encounterStarted) && !waitingForRespawn;
     public Transform BulletSpawnPoint => bulletSpawnPoint;
     public bool HasEyeBulletSpawnPoints => HasConfiguredEyeSpawnPoints();
+    public bool EncounterStarted => encounterStarted;
 
     public void Configure(Transform target, Transform spawnPoint, Transform[] spawnPoints, Material redBulletMaterial, PlayerHealth targetHealth)
     {
@@ -90,9 +93,25 @@ public class BatEnemy : MonoBehaviour
         bulletDamage = Mathf.Max(0f, newBulletDamage);
     }
 
+    public void ApplyEncounterTuning(float newShootInterval, float newBulletSpeed, float newBulletDamage, float newBulletSize)
+    {
+        ApplyEncounterTuning(newShootInterval, newBulletSpeed, newBulletDamage);
+        bulletSize = Mathf.Max(0.01f, newBulletSize);
+    }
+
     public void SetPreferredSpawnIndex(int spawnIndex)
     {
         preferredSpawnIndex = spawnIndex;
+    }
+
+    public void SetDescendTowardGround(bool enabled)
+    {
+        descendTowardGround = enabled;
+    }
+
+    public void SetRespawnOnDeath(bool enabled)
+    {
+        respawnOnDeath = enabled;
     }
 
     public void BeginEncounter()
@@ -211,7 +230,10 @@ public class BatEnemy : MonoBehaviour
         if ((waitForBowPickup && !encounterStarted) || waitingForRespawn || !gameObject.activeInHierarchy) return;
 
         RotateTowardPlayer();
-        MoveTowardGround();
+        if (descendTowardGround)
+        {
+            MoveTowardGround();
+        }
         ShootAtPlayer();
     }
 
@@ -321,7 +343,16 @@ public class BatEnemy : MonoBehaviour
 
     private void HandleDeath()
     {
-        StartRespawnCooldown(true);
+        if (respawnOnDeath)
+        {
+            StartRespawnCooldown(true);
+            return;
+        }
+
+        waitingForRespawn = true;
+        TryDropPickup();
+        CancelInvoke(nameof(Respawn));
+        SetPresentationActive(false);
     }
 
     private void StartRespawnCooldown(bool dropPickup)

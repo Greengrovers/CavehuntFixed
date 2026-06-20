@@ -110,7 +110,16 @@ public class PlayerHealth : MonoBehaviour
         EnsureGameOverMenu();
         if (gameOverMenu != null)
         {
-            gameOverMenu.Show();
+            gameOverMenu.ShowGameOver();
+        }
+    }
+
+    public void ShowGameWonMenu()
+    {
+        EnsureGameOverMenu();
+        if (gameOverMenu != null)
+        {
+            gameOverMenu.ShowGameWon();
         }
     }
 

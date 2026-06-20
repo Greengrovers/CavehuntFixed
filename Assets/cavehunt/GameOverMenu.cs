@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -14,6 +15,11 @@ public class GameOverMenu : MonoBehaviour
 
     [SerializeField] private PlayerHealth playerHealth;
     [SerializeField] private string backgroundResourcePath = "GameOver/GameOverBackground";
+    [SerializeField] private string gameWonBackgroundResourcePath = "GameWon/GameWonBackground";
+    [SerializeField] private string gameOverTitleText = "Game Over";
+    [SerializeField] private string gameOverHintText = "The cave claimed this run.";
+    [SerializeField] private string gameWonTitleText = "Game Won";
+    [SerializeField] private string gameWonHintText = "The cave is yours.";
     [SerializeField] private float menuDistance = 1.0f;
     [SerializeField] private Vector2 canvasSize = new Vector2(900f, 1120f);
     [SerializeField] private float canvasScale = 0.0026f;
@@ -26,6 +32,7 @@ public class GameOverMenu : MonoBehaviour
     [SerializeField] private Color selectedTextColor = Color.white;
     [SerializeField] private Color normalTextColor = Color.white;
     [SerializeField] private float navigationRepeatDelay = 0.22f;
+    [SerializeField] private float actionRevealDelay = 0.45f;
 
     private readonly GameObject[] buttonObjects = new GameObject[2];
     private readonly Image[] buttonImages = new Image[2];
@@ -34,8 +41,11 @@ public class GameOverMenu : MonoBehaviour
     private readonly MeshRenderer[] buttonWorldBackgrounds = new MeshRenderer[2];
 
     private GameObject worldTextRoot;
+    private Text titleLabel;
+    private Text hintLabel;
     private TextMesh titleWorldLabel;
     private TextMesh hintWorldLabel;
+    private CurvedRawImage backgroundImage;
 
     private Canvas canvas;
     private RectTransform canvasRect;
@@ -45,8 +55,21 @@ public class GameOverMenu : MonoBehaviour
     private float previousTimeScale = 1f;
     private bool previousAudioPause;
     private bool previousXRConfirmPressed;
+    private Coroutine pendingActionRoutine;
 
     public bool IsVisible => visible;
+
+    public void ShowGameOver()
+    {
+        ApplyContent(gameOverTitleText, gameOverHintText, backgroundResourcePath);
+        Show();
+    }
+
+    public void ShowGameWon()
+    {
+        ApplyContent(gameWonTitleText, gameWonHintText, gameWonBackgroundResourcePath);
+        Show();
+    }
 
     public void Configure(PlayerHealth health)
     {
@@ -67,6 +90,7 @@ public class GameOverMenu : MonoBehaviour
     private void Update()
     {
         if (!visible) return;
+        if (pendingActionRoutine != null) return;
 
         HandleNavigationInput();
 
@@ -98,6 +122,7 @@ public class GameOverMenu : MonoBehaviour
         }
 
         visible = true;
+        pendingActionRoutine = null;
         selectedIndex = 0;
         ApplyButtonColorDefaults();
 
@@ -105,6 +130,7 @@ public class GameOverMenu : MonoBehaviour
         AudioListener.pause = true;
 
         canvas.gameObject.SetActive(true);
+        SetMenuTextVisible(true);
         SetWorldTextActive(true);
         PositionInFrontOfCamera();
         RefreshSelectionVisuals();
@@ -150,16 +176,41 @@ public class GameOverMenu : MonoBehaviour
     }
     public void Retry()
     {
+        BeginDelayedAction(RetryAfterReveal());
+    }
+
+    public void Quit()
+    {
+        BeginDelayedAction(QuitAfterReveal());
+    }
+
+    private void BeginDelayedAction(IEnumerator routine)
+    {
+        if (pendingActionRoutine != null) return;
+
+        pendingActionRoutine = StartCoroutine(routine);
+    }
+
+    private IEnumerator RetryAfterReveal()
+    {
+        SetMenuTextVisible(false);
+        yield return new WaitForSecondsRealtime(Mathf.Max(0f, actionRevealDelay));
+
         Hide();
 
         if (playerHealth != null)
         {
             playerHealth.ResetToFullHealth();
         }
+
+        pendingActionRoutine = null;
     }
 
-    public void Quit()
+    private IEnumerator QuitAfterReveal()
     {
+        SetMenuTextVisible(false);
+        yield return new WaitForSecondsRealtime(Mathf.Max(0f, actionRevealDelay));
+
         Hide();
 
 #if UNITY_EDITOR
@@ -167,6 +218,8 @@ public class GameOverMenu : MonoBehaviour
 #else
         Application.Quit();
 #endif
+
+        pendingActionRoutine = null;
     }
 
     private void EnsureMenu()
@@ -193,22 +246,22 @@ public class GameOverMenu : MonoBehaviour
 
         CreateBackground(canvasRect);
 
-        CreateText(
+        titleLabel = CreateText(
             "Game Over Title",
             canvasRect,
-            "Game Over",
-            220,
+            gameOverTitleText,
+            176,
             titleColor,
             new Vector2(0.04f, 0.62f),
             new Vector2(0.96f, 0.88f),
             FontStyle.Bold
         );
 
-        CreateText(
+        hintLabel = CreateText(
             "Game Over Hint",
             canvasRect,
-            "The cave claimed this run.",
-            100,
+            gameOverHintText,
+            80,
             hintColor,
             new Vector2(0.04f, 0.47f),
             new Vector2(0.96f, 0.61f),
@@ -244,28 +297,48 @@ public class GameOverMenu : MonoBehaviour
         backgroundObject.transform.SetAsFirstSibling();
 
         RectTransform rect = backgroundObject.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(-0.25f, 0f);
-        rect.anchorMax = new Vector2(1.25f, 1f);
+        rect.anchorMin = new Vector2(-0.0775f, 0.032f);
+        rect.anchorMax = new Vector2(1.0775f, 0.648f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
         rect.localPosition = Vector3.zero;
 
-        CurvedRawImage image = backgroundObject.AddComponent<CurvedRawImage>();
-        image.raycastTarget = false;
-        image.color = Color.white;
-        image.Curve = backgroundCurve;
-        image.Segments = backgroundCurveSegments;
+        backgroundImage = backgroundObject.AddComponent<CurvedRawImage>();
+        backgroundImage.raycastTarget = false;
+        backgroundImage.color = Color.white;
+        backgroundImage.Curve = backgroundCurve;
+        backgroundImage.Segments = backgroundCurveSegments;
+        ApplyBackground(backgroundResourcePath);
+    }
 
-        Texture2D texture = Resources.Load<Texture2D>(backgroundResourcePath);
+    private void ApplyContent(string title, string hint, string backgroundPath)
+    {
+        EnsureMenu();
 
+        if (titleLabel != null) titleLabel.text = title;
+        if (hintLabel != null) hintLabel.text = hint;
+        if (titleWorldLabel != null) titleWorldLabel.text = title;
+        if (hintWorldLabel != null) hintWorldLabel.text = hint;
+
+        ApplyBackground(backgroundPath);
+    }
+
+    private void ApplyBackground(string resourcePath)
+    {
+        if (backgroundImage == null) return;
+
+        Texture2D texture = Resources.Load<Texture2D>(resourcePath);
         if (texture != null)
         {
-            image.texture = texture;
+            backgroundImage.texture = texture;
+            backgroundImage.color = Color.white;
+            return;
         }
-        else
-        {
-            image.color = new Color(0.58f, 0.02f, 0.01f, 1f);
-        }
+
+        backgroundImage.texture = null;
+        backgroundImage.color = resourcePath == gameWonBackgroundResourcePath
+            ? new Color(0.2f, 0.85f, 1f, 1f)
+            : new Color(0.58f, 0.02f, 0.01f, 1f);
     }
 
     private Text CreateText(
@@ -300,7 +373,7 @@ public class GameOverMenu : MonoBehaviour
         label.horizontalOverflow = HorizontalWrapMode.Wrap;
         label.verticalOverflow = VerticalWrapMode.Truncate;
         label.resizeTextForBestFit = true;
-        label.resizeTextMinSize = 60;
+        label.resizeTextMinSize = 48;
         label.resizeTextMaxSize = size;
         label.raycastTarget = false;
 
@@ -354,7 +427,7 @@ public class GameOverMenu : MonoBehaviour
             text + " Label",
             rect,
             text,
-            150,
+            120,
             normalTextColor,
             Vector2.zero,
             Vector2.one,
@@ -539,10 +612,10 @@ public class GameOverMenu : MonoBehaviour
         worldTextRoot = new GameObject("Game Over Readable 3D Text");
         worldTextRoot.transform.SetParent(transform, false);
 
-        titleWorldLabel = CreateWorldTextLabel("Game Over 3D Title", "Game Over", 96, 0.026f, titleColor, FontStyle.Bold);
-        hintWorldLabel = CreateWorldTextLabel("Game Over 3D Hint", "The cave claimed this run.", 72, 0.015f, hintColor, FontStyle.Bold);
-        buttonWorldLabels[0] = CreateWorldTextLabel("Retry 3D Label", "Retry", 88, 0.022f, normalTextColor, FontStyle.Bold);
-        buttonWorldLabels[1] = CreateWorldTextLabel("Quit 3D Label", "Quit", 88, 0.022f, normalTextColor, FontStyle.Bold);
+        titleWorldLabel = CreateWorldTextLabel("Game Over 3D Title", gameOverTitleText, 77, 0.0208f, titleColor, FontStyle.Bold);
+        hintWorldLabel = CreateWorldTextLabel("Game Over 3D Hint", gameOverHintText, 58, 0.012f, hintColor, FontStyle.Bold);
+        buttonWorldLabels[0] = CreateWorldTextLabel("Retry 3D Label", "Retry", 70, 0.0176f, normalTextColor, FontStyle.Bold);
+        buttonWorldLabels[1] = CreateWorldTextLabel("Quit 3D Label", "Quit", 70, 0.0176f, normalTextColor, FontStyle.Bold);
         buttonWorldBackgrounds[0] = CreateWorldButtonBackground("Retry 3D Background");
         buttonWorldBackgrounds[1] = CreateWorldButtonBackground("Quit 3D Background");
 
@@ -643,6 +716,22 @@ public class GameOverMenu : MonoBehaviour
         {
             worldTextRoot.SetActive(active);
         }
+    }
+
+    private void SetMenuTextVisible(bool active)
+    {
+        if (titleLabel != null) titleLabel.enabled = active;
+        if (hintLabel != null) hintLabel.enabled = active;
+
+        for (int i = 0; i < buttonLabels.Length; i++)
+        {
+            if (buttonLabels[i] != null)
+            {
+                buttonLabels[i].enabled = active;
+            }
+        }
+
+        SetWorldTextActive(active && visible);
     }
 
     private void UpdateWorldTextTransform(Camera camera)

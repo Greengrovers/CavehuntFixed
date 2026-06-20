@@ -8,12 +8,16 @@ public class BatOuterRingSpawner : MonoBehaviour
     [SerializeField] private Transform spawnPointParent;
     [SerializeField] private string spawnPointParentName = "Bat Outer Ring Spawn Points";
     [SerializeField] private Material bulletMaterial;
+    [SerializeField] private CavehuntEnemyRole enemyRole = CavehuntEnemyRole.OuterRing;
 
     [Header("Spawning")]
     [SerializeField] private bool spawnAutomatically = false;
     [SerializeField, Min(0.1f)] private float spawnInterval = 3f;
     [SerializeField, Min(0)] private int maxActiveBats;
+    [SerializeField, Min(0)] private int maxTotalBats;
     [SerializeField] private string spawnedBatNamePrefix = "Bat Outer Ring";
+    [SerializeField, Min(1)] private int spawnPointStep = 1;
+    [SerializeField, Range(0f, 1f)] private float inwardProjection = 0f;
 
     private readonly List<Transform> spawnPoints = new List<Transform>();
     private Transform playerTarget;
@@ -22,6 +26,8 @@ public class BatOuterRingSpawner : MonoBehaviour
     private int spawnedCount;
     private bool warnedMissingPrefab;
     private bool warnedMissingSpawnPoints;
+    private CavehuntDifficultySettings difficultySettings;
+    private CavehuntEncounterDirector encounterDirector;
 
     private void Awake()
     {
@@ -52,6 +58,55 @@ public class BatOuterRingSpawner : MonoBehaviour
     public void StopSpawning()
     {
         CancelInvoke(nameof(SpawnBat));
+    }
+
+    public void ConfigureRuntime(
+        CavehuntEnemyRole role,
+        string pointParentName,
+        string namePrefix,
+        int pointStep,
+        float projectionToCenter,
+        float interval,
+        int maxActive,
+        int maxTotal
+    )
+    {
+        enemyRole = role;
+        spawnPointParentName = pointParentName;
+        spawnedBatNamePrefix = namePrefix;
+        spawnPointStep = Mathf.Max(1, pointStep);
+        inwardProjection = Mathf.Clamp01(projectionToCenter);
+        spawnInterval = Mathf.Max(0.1f, interval);
+        maxActiveBats = Mathf.Max(0, maxActive);
+        maxTotalBats = Mathf.Max(0, maxTotal);
+        spawnAutomatically = false;
+        spawnPointParent = null;
+        RefreshSpawnPoints();
+    }
+
+    public void CopyRuntimeReferencesFrom(BatOuterRingSpawner source)
+    {
+        if (source == null) return;
+
+        if (batPrefab == null)
+        {
+            batPrefab = source.batPrefab;
+        }
+
+        if (bulletMaterial == null)
+        {
+            bulletMaterial = source.bulletMaterial;
+        }
+
+        if (spawnPointParent == null)
+        {
+            spawnPointParent = source.spawnPointParent;
+        }
+
+        if (!string.IsNullOrWhiteSpace(source.spawnPointParentName))
+        {
+            spawnPointParentName = source.spawnPointParentName;
+        }
     }
 
     public void ResetForBowPickup()
@@ -91,6 +146,12 @@ public class BatOuterRingSpawner : MonoBehaviour
             return;
         }
 
+        if (maxTotalBats > 0 && spawnedCount >= maxTotalBats)
+        {
+            StopSpawning();
+            return;
+        }
+
         int spawnIndex = Random.Range(0, spawnPoints.Count);
         Transform spawnPoint = spawnPoints[spawnIndex];
         if (spawnPoint == null)
@@ -114,7 +175,23 @@ public class BatOuterRingSpawner : MonoBehaviour
         BatEnemy batEnemy = bat.GetComponent<BatEnemy>();
         if (batEnemy == null) return;
 
+        CavehuntDifficultySettings settings = ResolveDifficultySettings();
+        Damageable damageable = bat.GetComponent<Damageable>();
+        if (damageable != null)
+        {
+            settings.ApplyHealthTo(damageable, enemyRole);
+        }
+
+        EnemyHealthBar healthBar = bat.GetComponent<EnemyHealthBar>();
+        if (healthBar == null)
+        {
+            healthBar = bat.AddComponent<EnemyHealthBar>();
+        }
+
+        bat.transform.localScale = bat.transform.localScale * settings.GetScaleMultiplier(enemyRole);
+
         ResolvePlayerReferences();
+        healthBar.Configure(playerTarget);
         Material resolvedBulletMaterial = ResolveBulletMaterial();
         Transform[] resolvedSpawnPoints = spawnPoint != null
             ? new[] { spawnPoint }
@@ -123,6 +200,13 @@ public class BatOuterRingSpawner : MonoBehaviour
         batEnemy.SetPreferredSpawnIndex(0);
         batEnemy.Configure(playerTarget, batEnemy.BulletSpawnPoint, resolvedSpawnPoints, resolvedBulletMaterial, playerHealth);
         batEnemy.BeginEncounter();
+
+        CavehuntEnemyKillTracker killTracker = bat.GetComponent<CavehuntEnemyKillTracker>();
+        if (killTracker == null)
+        {
+            killTracker = bat.AddComponent<CavehuntEnemyKillTracker>();
+        }
+        killTracker.Configure(enemyRole, ResolveEncounterDirector());
     }
 
     private void ResolveReferences()
@@ -159,14 +243,60 @@ public class BatOuterRingSpawner : MonoBehaviour
         spawnPoints.Clear();
         if (spawnPointParent == null) return;
 
+        Vector3 center = CalculateSpawnCenter();
         for (int i = 0; i < spawnPointParent.childCount; i++)
         {
             Transform child = spawnPointParent.GetChild(i);
-            if (child != null && child.gameObject.activeInHierarchy)
+            if (child != null && child.gameObject.activeInHierarchy && i % Mathf.Max(1, spawnPointStep) == 0)
             {
-                spawnPoints.Add(child);
+                spawnPoints.Add(CreateProjectedSpawnPoint(child, center, spawnPoints.Count));
             }
         }
+    }
+
+    private Vector3 CalculateSpawnCenter()
+    {
+        Vector3 center = Vector3.zero;
+        int count = 0;
+
+        for (int i = 0; i < spawnPointParent.childCount; i++)
+        {
+            Transform child = spawnPointParent.GetChild(i);
+            if (child == null || !child.gameObject.activeInHierarchy) continue;
+
+            center += child.position;
+            count++;
+        }
+
+        if (count > 0)
+        {
+            center /= count;
+        }
+        else
+        {
+            center = spawnPointParent.position;
+        }
+
+        return center;
+    }
+
+    private Transform CreateProjectedSpawnPoint(Transform source, Vector3 center, int index)
+    {
+        if (source == null || inwardProjection <= 0f) return source;
+
+        string pointName = $"Projected {enemyRole} Spawn {index + 1:00}";
+        Transform point = transform.Find(pointName);
+        if (point == null)
+        {
+            point = new GameObject(pointName).transform;
+            point.SetParent(transform, false);
+        }
+
+        Vector3 projected = source.position;
+        projected.x = Mathf.Lerp(source.position.x, center.x, inwardProjection);
+        projected.z = Mathf.Lerp(source.position.z, center.z, inwardProjection);
+        point.SetPositionAndRotation(projected, source.rotation);
+        return point;
     }
 
     private void ResolvePlayerReferences()
@@ -220,6 +350,26 @@ public class BatOuterRingSpawner : MonoBehaviour
         if (runtimeBulletMaterial.HasProperty("_Smoothness")) runtimeBulletMaterial.SetFloat("_Smoothness", 0.2f);
 
         return runtimeBulletMaterial;
+    }
+
+    private CavehuntDifficultySettings ResolveDifficultySettings()
+    {
+        if (difficultySettings == null)
+        {
+            difficultySettings = CavehuntDifficultySettings.Resolve();
+        }
+
+        return difficultySettings;
+    }
+
+    private CavehuntEncounterDirector ResolveEncounterDirector()
+    {
+        if (encounterDirector == null)
+        {
+            encounterDirector = CavehuntEncounterDirector.Resolve(false);
+        }
+
+        return encounterDirector;
     }
 
     private int CountActiveSpawnedBats()

@@ -4,11 +4,11 @@ using UnityEngine.SceneManagement;
 public static class BatEncounterBootstrap
 {
     private const int EnemyCount = 2;
-    private const float BatScaleMultiplier = 1.1f;
-    private const float DefaultBatMaxHealth = 3f;
     private const float BatShootInterval = 1.1f;
     private const float BatBulletSpeed = 12f;
     private const float BatBulletDamage = 1f;
+    private const float BossBulletDamageMultiplier = 2f;
+    private const float BossBulletSize = 1.8f;
     private const float FallbackCeilingHeightAbovePlayer = 7f;
     private const float MinimumCeilingHeightAbovePlayer = 5.5f;
     private const float MaximumCeilingHeightAbovePlayer = 9f;
@@ -29,6 +29,8 @@ public static class BatEncounterBootstrap
         GameObject templateBat = GameObject.Find("Bat");
         if (templateBat == null) return;
 
+        CavehuntDifficultySettings difficultySettings = CavehuntDifficultySettings.Resolve();
+        CavehuntEncounterDirector encounterDirector = CavehuntEncounterDirector.Resolve();
         Transform playerTarget = FindPlayerTarget();
         PlayerHealth playerHealth = EnsurePlayerHealth(playerTarget);
         EnsurePlayerAmmoInventory(playerHealth, playerTarget);
@@ -41,8 +43,11 @@ public static class BatEncounterBootstrap
 
         for (int i = 0; i < bats.Length; i++)
         {
-            ConfigureBat(bats[i], playerTarget, playerHealth, spawnPoints, bulletMaterial, baseScale, i);
+            ConfigureBat(bats[i], playerTarget, playerHealth, spawnPoints, bulletMaterial, baseScale, i, difficultySettings, encounterDirector);
         }
+
+        EnsureBossEnemy(templateBat, playerTarget, playerHealth, spawnPoints, bulletMaterial, baseScale, difficultySettings, encounterDirector);
+        encounterDirector.ResetForBowPickup();
     }
 
     private static GameObject[] EnsureBatEnemies(GameObject templateBat, int enemyCount)
@@ -66,20 +71,20 @@ public static class BatEncounterBootstrap
         return bats;
     }
 
-    private static void ConfigureBat(GameObject bat, Transform playerTarget, PlayerHealth playerHealth, Transform[] spawnPoints, Material bulletMaterial, Vector3 baseScale, int spawnOffset)
+    private static void ConfigureBat(GameObject bat, Transform playerTarget, PlayerHealth playerHealth, Transform[] spawnPoints, Material bulletMaterial, Vector3 baseScale, int spawnOffset, CavehuntDifficultySettings difficultySettings, CavehuntEncounterDirector encounterDirector)
     {
         bat.SetActive(true);
-        bat.transform.localScale = baseScale * BatScaleMultiplier;
+        bat.transform.localScale = baseScale * difficultySettings.BatScaleMultiplier;
 
         Damageable damageable = bat.GetComponent<Damageable>();
         if (damageable == null)
         {
             damageable = bat.AddComponent<Damageable>();
-            damageable.SetMaxHealth(DefaultBatMaxHealth);
+            difficultySettings.ApplyHealthTo(damageable, false);
         }
         else
         {
-            damageable.EnsureValidMaxHealth(DefaultBatMaxHealth);
+            difficultySettings.ApplyHealthTo(damageable, false);
         }
 
         if (bat.GetComponentInChildren<Collider>() == null)
@@ -113,6 +118,7 @@ public static class BatEncounterBootstrap
             ? batEnemy.BulletSpawnPoint
             : EnsureBulletSpawnPoint(bat.transform);
         batEnemy.SetPreferredSpawnIndex(spawnOffset);
+        batEnemy.SetRespawnOnDeath(false);
         batEnemy.ApplyEncounterTuning(BatShootInterval, BatBulletSpeed, BatBulletDamage);
         batEnemy.Configure(playerTarget, bulletSpawn, spawnPoints, bulletMaterial, playerHealth);
 
@@ -122,8 +128,87 @@ public static class BatEncounterBootstrap
             pickupDropper = bat.AddComponent<EnemyPickupDropper>();
             pickupDropper.Configure(0.25f);
         }
+
+        CavehuntEnemyKillTracker killTracker = bat.GetComponent<CavehuntEnemyKillTracker>();
+        if (killTracker == null)
+        {
+            killTracker = bat.AddComponent<CavehuntEnemyKillTracker>();
+        }
+        killTracker.Configure(CavehuntEnemyRole.Tutorial, encounterDirector);
     }
 
+
+    private static void EnsureBossEnemy(GameObject templateBat, Transform playerTarget, PlayerHealth playerHealth, Transform[] spawnPoints, Material bulletMaterial, Vector3 baseScale, CavehuntDifficultySettings difficultySettings, CavehuntEncounterDirector encounterDirector)
+    {
+        GameObject boss = GameObject.Find("Boss Bat");
+        if (boss == null)
+        {
+            boss = UnityEngine.Object.Instantiate(templateBat);
+            boss.name = "Boss Bat";
+        }
+
+        boss.SetActive(true);
+        boss.transform.localScale = baseScale * difficultySettings.BossScaleMultiplier;
+
+        Damageable damageable = boss.GetComponent<Damageable>();
+        if (damageable == null)
+        {
+            damageable = boss.AddComponent<Damageable>();
+        }
+        difficultySettings.ApplyHealthTo(damageable, true);
+
+        SphereCollider collider = boss.GetComponent<SphereCollider>();
+        if (collider == null && boss.GetComponentInChildren<Collider>() == null)
+        {
+            collider = boss.AddComponent<SphereCollider>();
+        }
+        if (collider != null)
+        {
+            collider.radius = Mathf.Max(collider.radius, 0.9f);
+        }
+
+        BatEnemy batEnemy = boss.GetComponent<BatEnemy>();
+        if (batEnemy == null)
+        {
+            batEnemy = boss.AddComponent<BatEnemy>();
+        }
+
+        BossEnemy bossEnemy = boss.GetComponent<BossEnemy>();
+        if (bossEnemy == null)
+        {
+            bossEnemy = boss.AddComponent<BossEnemy>();
+        }
+        bossEnemy.ApplyDifficulty(difficultySettings);
+
+        EnemyHealthBar healthBar = boss.GetComponent<EnemyHealthBar>();
+        if (healthBar == null)
+        {
+            healthBar = boss.AddComponent<EnemyHealthBar>();
+        }
+        healthBar.Configure(playerTarget);
+
+        Transform bulletSpawn = batEnemy.BulletSpawnPoint != null
+            ? batEnemy.BulletSpawnPoint
+            : EnsureBulletSpawnPoint(boss.transform);
+        batEnemy.SetPreferredSpawnIndex(spawnPoints != null && spawnPoints.Length > 0 ? spawnPoints.Length - 1 : 0);
+        batEnemy.SetDescendTowardGround(false);
+        batEnemy.SetRespawnOnDeath(false);
+        batEnemy.ApplyEncounterTuning(BatShootInterval, BatBulletSpeed, BatBulletDamage * BossBulletDamageMultiplier, BossBulletSize);
+        batEnemy.Configure(playerTarget, bulletSpawn, spawnPoints, bulletMaterial, playerHealth);
+
+        EnemyPickupDropper pickupDropper = boss.GetComponent<EnemyPickupDropper>();
+        if (pickupDropper != null)
+        {
+            UnityEngine.Object.Destroy(pickupDropper);
+        }
+
+        CavehuntEnemyKillTracker killTracker = boss.GetComponent<CavehuntEnemyKillTracker>();
+        if (killTracker == null)
+        {
+            killTracker = boss.AddComponent<CavehuntEnemyKillTracker>();
+        }
+        killTracker.Configure(CavehuntEnemyRole.Boss, encounterDirector);
+    }
     private static Transform FindPlayerTarget()
     {
         Camera camera = VrCameraResolver.GetCamera();

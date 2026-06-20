@@ -71,6 +71,9 @@ public class EnemyHealthBar : MonoBehaviour
 
         backgroundMaterial = backgroundRenderer.sharedMaterial;
         fillMaterial = fillRenderer.sharedMaterial;
+
+        if (backgroundRenderer != null) backgroundRenderer.enabled = false;
+        if (fillRenderer != null) fillRenderer.enabled = false;
     }
 
     private Transform CreateBarSegment(string segmentName, Color color, out Renderer segmentRenderer)

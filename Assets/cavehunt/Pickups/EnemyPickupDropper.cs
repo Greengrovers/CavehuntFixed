@@ -5,7 +5,7 @@ public class EnemyPickupDropper : MonoBehaviour
 {
     [SerializeField, Range(0f, 1f)] private float dropChance = 0.25f;
     [SerializeField] private GameObject[] pickupPrefabs;
-    [SerializeField] private float spawnLift = 0.08f;
+    [SerializeField] private float spawnLift = 0f;
     [SerializeField] private float horizontalJitter = 0.2f;
     [SerializeField] private float groundProbeStartHeight = 2f;
     [SerializeField] private float groundProbeDistance = 50f;
@@ -183,7 +183,8 @@ public class EnemyPickupDropper : MonoBehaviour
 
     private Vector3 ResolveGroundDropPosition(Vector3 horizontalPosition, Vector2 jitter, float lift)
     {
-        Vector3 horizontalDropPosition = horizontalPosition + new Vector3(jitter.x, 0f, jitter.y);
+        float probeBaseY = ResolveGroundProbeBaseY(horizontalPosition.y);
+        Vector3 horizontalDropPosition = new Vector3(horizontalPosition.x + jitter.x, probeBaseY, horizontalPosition.z + jitter.y);
         Vector3 probeStart = horizontalDropPosition + Vector3.up * Mathf.Max(0.1f, groundProbeStartHeight);
         float probeDistance = Mathf.Max(0.1f, groundProbeStartHeight + groundProbeDistance);
 
@@ -218,6 +219,17 @@ public class EnemyPickupDropper : MonoBehaviour
         }
 
         return horizontalDropPosition + Vector3.up * Mathf.Max(0f, lift);
+    }
+
+    private float ResolveGroundProbeBaseY(float fallbackY)
+    {
+        Transform playerTarget = ResolvePlayerTarget();
+        if (playerTarget != null)
+        {
+            return playerTarget.position.y;
+        }
+
+        return Mathf.Min(fallbackY, 0f);
     }
 
     private bool IsGroundDropSurface(Collider candidate)

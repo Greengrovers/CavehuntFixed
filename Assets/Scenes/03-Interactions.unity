@@ -1860,6 +1860,37 @@ Transform:
   m_Children: []
   m_Father: {fileID: 969306568}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &674086197
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 674086198}
+  m_Layer: 0
+  m_Name: BossbatSpawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &674086198
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 674086197}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -279.94684, y: 239, z: -294}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &738716319
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -3101,10 +3132,14 @@ MonoBehaviour:
   spawnPointParent: {fileID: 969306568}
   spawnPointParentName: Bat Outer Ring Spawn Points
   bulletMaterial: {fileID: 0}
+  enemyRole: 1
   spawnAutomatically: 0
   spawnInterval: 3
   maxActiveBats: 0
+  maxTotalBats: 0
   spawnedBatNamePrefix: Bat Outer Ring
+  spawnPointStep: 1
+  inwardProjection: 0
 --- !u!4 &1206628746
 Transform:
   m_ObjectHideFlags: 0
@@ -4017,6 +4052,8 @@ MonoBehaviour:
   groundY: 2.18
   groundHitDamage: 1
   respawnDelay: 2
+  descendTowardGround: 1
+  respawnOnDeath: 1
   minPlayerSpawnDistance: 1.5
   spawnPositionJitter: 0.35
   spawnHeightJitter: 0.2
@@ -12520,7 +12557,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 5457a6b4e4a493548bc4c22f17952b47, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 64.944805
+      value: 64.9448
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 5457a6b4e4a493548bc4c22f17952b47, type: 3}
       propertyPath: m_LocalPosition.y
@@ -12528,7 +12565,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 5457a6b4e4a493548bc4c22f17952b47, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -76.040597
+      value: -76.040596
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 5457a6b4e4a493548bc4c22f17952b47, type: 3}
       propertyPath: m_LocalRotation.w
@@ -13810,10 +13847,11 @@ SceneRoots:
   - {fileID: 3100000078}
   - {fileID: 3100000079}
   - {fileID: 3100000080}
-  - {fileID: 818754233}
   - {fileID: 1632504714}
   - {fileID: 1383513339}
   - {fileID: 435791323}
   - {fileID: 3100000021}
   - {fileID: 969306568}
   - {fileID: 1206628746}
+  - {fileID: 674086198}
+  - {fileID: 818754233}

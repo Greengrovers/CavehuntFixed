@@ -202,6 +202,14 @@ public class BowStartExperience : MonoBehaviour
         if (encounterStarted || !startEnemiesOnBowPickup) return;
 
         encounterStarted = true;
+
+        CavehuntEncounterDirector director = CavehuntEncounterDirector.Resolve(false);
+        if (director != null)
+        {
+            director.BeginRun();
+            return;
+        }
+
         BatEnemy[] enemies = FindObjectsByType<BatEnemy>(FindObjectsInactive.Include);
         for (int i = 0; i < enemies.Length; i++)
         {
@@ -377,6 +385,13 @@ public class BowStartExperience : MonoBehaviour
 
     private static void StopEnemiesUntilBowPickup()
     {
+        CavehuntEncounterDirector director = CavehuntEncounterDirector.Resolve(false);
+        if (director != null)
+        {
+            director.ResetForBowPickup();
+            return;
+        }
+
         BatEnemy[] enemies = FindObjectsByType<BatEnemy>(FindObjectsInactive.Include);
         for (int i = 0; i < enemies.Length; i++)
         {
