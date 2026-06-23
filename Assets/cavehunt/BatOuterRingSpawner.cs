@@ -13,6 +13,7 @@ public class BatOuterRingSpawner : MonoBehaviour
     [Header("Spawning")]
     [SerializeField] private bool spawnAutomatically = false;
     [SerializeField, Min(0.1f)] private float spawnInterval = 3f;
+    [SerializeField, Min(0)] private int minActiveBats;
     [SerializeField, Min(0)] private int maxActiveBats;
     [SerializeField, Min(0)] private int maxTotalBats;
     [SerializeField] private string spawnedBatNamePrefix = "Bat Outer Ring";
@@ -67,6 +68,7 @@ public class BatOuterRingSpawner : MonoBehaviour
         int pointStep,
         float projectionToCenter,
         float interval,
+        int minActive,
         int maxActive,
         int maxTotal
     )
@@ -77,6 +79,7 @@ public class BatOuterRingSpawner : MonoBehaviour
         spawnPointStep = Mathf.Max(1, pointStep);
         inwardProjection = Mathf.Clamp01(projectionToCenter);
         spawnInterval = Mathf.Max(0.1f, interval);
+        minActiveBats = Mathf.Max(0, minActive);
         maxActiveBats = Mathf.Max(0, maxActive);
         maxTotalBats = Mathf.Max(0, maxTotal);
         spawnAutomatically = false;
@@ -166,6 +169,7 @@ public class BatOuterRingSpawner : MonoBehaviour
         bat.SetActive(true);
 
         ConfigureSpawnedBat(bat, spawnPoint);
+        RefillMinimumActiveBats();
     }
 
     private void ConfigureSpawnedBat(GameObject bat, Transform spawnPoint)
@@ -198,6 +202,7 @@ public class BatOuterRingSpawner : MonoBehaviour
             : spawnPoints.ToArray();
 
         batEnemy.SetPreferredSpawnIndex(0);
+        batEnemy.SetDescendSpeed(settings.BatDescendSpeed);
         batEnemy.Configure(playerTarget, batEnemy.BulletSpawnPoint, resolvedSpawnPoints, resolvedBulletMaterial, playerHealth);
         batEnemy.BeginEncounter();
 
@@ -385,6 +390,21 @@ public class BatOuterRingSpawner : MonoBehaviour
         }
 
         return activeCount;
+    }
+
+    private void RefillMinimumActiveBats()
+    {
+        if (minActiveBats <= 0) return;
+
+        int guard = 0;
+        while (CountActiveSpawnedBats() < minActiveBats && guard < minActiveBats + 4)
+        {
+            guard++;
+            if (maxActiveBats > 0 && CountActiveSpawnedBats() >= maxActiveBats) return;
+            if (maxTotalBats > 0 && spawnedCount >= maxTotalBats) return;
+
+            SpawnBat();
+        }
     }
 
     private void WarnOnce(ref bool warned, string message)

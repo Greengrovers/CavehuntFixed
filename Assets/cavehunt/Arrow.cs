@@ -23,6 +23,7 @@ public class Arrow : MonoBehaviour
     private ArrowAmmoVfx ammoVfx;
 
     public float GrenadeExplosionRadius => Mathf.Max(0.01f, grenadeExplosionRadius);
+    public bool HasBeenShot => hasBeenShot;
 
     private void Awake()
     {

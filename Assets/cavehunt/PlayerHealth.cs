@@ -58,6 +58,7 @@ public class PlayerHealth : MonoBehaviour
 
             if (autoCreateGameOverMenu)
             {
+                CavehuntRuntimeCleanup.DestroyGameplayLeftovers();
                 ClearDamageFlash();
                 BowStartExperience.HideAllBowsForPlayerDeath();
                 ShowGameOverMenu();
@@ -89,6 +90,7 @@ public class PlayerHealth : MonoBehaviour
         }
 
         currentHealth = maxHealth;
+        CavehuntRuntimeCleanup.DestroyGameplayLeftovers();
         ClearDamageFlash();
         BowStartExperience.ResetAllBowsForRetry();
 
@@ -98,6 +100,21 @@ public class PlayerHealth : MonoBehaviour
         }
 
         Debug.Log($"Player health reset: {currentHealth}/{maxHealth}");
+    }
+
+    public void SetMaxHealth(float value, bool resetCurrentHealth = true)
+    {
+        maxHealth = Mathf.Max(1f, value);
+        if (resetCurrentHealth)
+        {
+            currentHealth = maxHealth;
+        }
+        else
+        {
+            currentHealth = Mathf.Min(currentHealth, maxHealth);
+        }
+
+        Debug.Log($"Player max health set: {currentHealth}/{maxHealth}");
     }
 
     public void RetryFromGameOver()
@@ -127,6 +144,7 @@ public class PlayerHealth : MonoBehaviour
     {
         yield return new WaitForSeconds(Mathf.Max(0.05f, deathRespawnDelay));
         currentHealth = maxHealth;
+        CavehuntRuntimeCleanup.DestroyGameplayLeftovers();
         ClearDamageFlash();
         BowStartExperience.ResetAllBowsForRetry();
         Debug.Log($"Player health reset: {currentHealth}/{maxHealth}");

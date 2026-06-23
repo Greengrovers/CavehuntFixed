@@ -5,16 +5,18 @@ using UnityEngine.SceneManagement;
 [RequireComponent(typeof(Damageable))]
 public class BossEnemy : MonoBehaviour
 {
-    private const float DefaultTornadoRadius = 4.5f;
-    private const int DefaultTornadoHelperCount = 16;
+    private const float DefaultFallbackStartRadius = 18f;
+    private const float DefaultTornadoEndRadius = 1.5f;
+    private const int DefaultTornadoHelperCount = 24;
 
     [SerializeField] private bool applyDifficultyHealthOnEnable = true;
     [SerializeField] private string spawnPointName = "BossbatSpawn";
-    [SerializeField] private float tornadoRadius = 4.5f;
+    [SerializeField] private float fallbackStartRadius = DefaultFallbackStartRadius;
+    [SerializeField] private float tornadoEndRadius = DefaultTornadoEndRadius;
     [SerializeField] private float tornadoTurns = 5f;
     [SerializeField] private float tornadoMoveSpeed = 4f;
-    [SerializeField] private float tornadoMaxDuration = 120f;
-    [SerializeField, Min(8)] private int tornadoHelperCount = 16;
+    [SerializeField] private float tornadoDescendSpeed = 0.9f;
+    [SerializeField, Min(8)] private int tornadoHelperCount = DefaultTornadoHelperCount;
     [SerializeField] private float groundY = 0.05f;
 
     private BatEnemy batEnemy;
@@ -27,7 +29,9 @@ public class BossEnemy : MonoBehaviour
     private float tornadoElapsed;
     private bool tornadoActive;
     private Transform tornadoHelperRoot;
-    private int tornadoHelperIndex;
+    private Vector3 tornadoRight = Vector3.right;
+    private Vector3 tornadoForward = Vector3.forward;
+    private float activeStartRadius;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void CreateSceneTornadoHelpers()
@@ -38,7 +42,9 @@ public class BossEnemy : MonoBehaviour
         GameObject spawnObject = GameObject.Find("BossbatSpawn") ?? GameObject.Find("Boss Bat Spawn");
         if (spawnObject == null) return;
 
-        CreateHelperRing(spawnObject.transform, DefaultTornadoRadius, DefaultTornadoHelperCount);
+        Vector3 centerPosition = ResolveArenaCenter(spawnObject.transform.position);
+        float startRadius = CalculateHorizontalRadius(spawnObject.transform.position, centerPosition, DefaultFallbackStartRadius);
+        CreateHelperSpiral(spawnObject.transform, centerPosition, startRadius, DefaultTornadoEndRadius, 5f, 0.05f, DefaultTornadoHelperCount);
     }
 
     public void ApplyDifficulty(CavehuntDifficultySettings settings, bool resetCurrentHealth = true)
@@ -51,10 +57,19 @@ public class BossEnemy : MonoBehaviour
         settings.ApplyHealthTo(GetComponent<Damageable>(), true, resetCurrentHealth);
     }
 
+    public void SetDescendSpeed(float speed)
+    {
+        tornadoDescendSpeed = Mathf.Max(0.05f, speed);
+    }
+
     public void PrepareForEncounter(CavehuntDifficultySettings settings)
     {
         EnsureReferences();
         ApplyDifficulty(settings);
+        if (settings != null)
+        {
+            SetDescendSpeed(settings.BossDescendSpeed);
+        }
 
         if (batEnemy != null)
         {
@@ -66,10 +81,21 @@ public class BossEnemy : MonoBehaviour
         gameObject.SetActive(false);
     }
 
+    public void ConfigureTornadoPath(float endRadius = DefaultTornadoEndRadius, int helperCount = DefaultTornadoHelperCount)
+    {
+        tornadoEndRadius = Mathf.Max(0f, endRadius);
+        tornadoHelperCount = Mathf.Max(8, helperCount);
+        tornadoHelperRoot = null;
+    }
+
     public void BeginBossEncounter(Transform fallbackSpawnPoint, CavehuntDifficultySettings settings)
     {
         EnsureReferences();
         ApplyDifficulty(settings);
+        if (settings != null)
+        {
+            SetDescendSpeed(settings.BossDescendSpeed);
+        }
 
         if (batEnemy != null)
         {
@@ -129,14 +155,7 @@ public class BossEnemy : MonoBehaviour
 
         tornadoElapsed += Time.deltaTime;
         float t = tornadoDuration <= 0f ? 1f : Mathf.Clamp01(tornadoElapsed / tornadoDuration);
-        float y = Mathf.Lerp(tornadoStart.y, groundY, t);
-        Vector3 targetPosition = ResolveCurrentHelperTarget(y);
-        transform.position = Vector3.MoveTowards(transform.position, targetPosition, Mathf.Max(0.1f, tornadoMoveSpeed) * Time.deltaTime);
-
-        if (Vector3.Distance(transform.position, targetPosition) <= 0.15f)
-        {
-            AdvanceTornadoHelper();
-        }
+        transform.position = ResolveTornadoPosition(t);
 
         FacePlayer();
 
@@ -174,40 +193,58 @@ public class BossEnemy : MonoBehaviour
 
     private void ConfigureTornado(Vector3 centerPosition, Quaternion startRotation)
     {
-        Vector3 right = startRotation * Vector3.right;
+        tornadoCenter = ResolveArenaCenter(centerPosition);
+
+        Vector3 right = Vector3.ProjectOnPlane(centerPosition - tornadoCenter, Vector3.up);
+        if (right.sqrMagnitude <= 0.0001f)
+        {
+            right = Vector3.ProjectOnPlane(startRotation * Vector3.right, Vector3.up);
+        }
+        if (right.sqrMagnitude <= 0.0001f)
+        {
+            right = Vector3.ProjectOnPlane(startRotation * Vector3.forward, Vector3.up);
+        }
         if (right.sqrMagnitude <= 0.0001f)
         {
             right = Vector3.right;
         }
 
-        tornadoCenter = centerPosition;
-        tornadoStart = centerPosition + right.normalized * Mathf.Max(0f, tornadoRadius);
+        tornadoRight = right.normalized;
+        tornadoForward = Vector3.Cross(Vector3.up, tornadoRight).normalized;
+        if (tornadoForward.sqrMagnitude <= 0.0001f)
+        {
+            tornadoForward = Vector3.forward;
+        }
+
+        activeStartRadius = CalculateHorizontalRadius(centerPosition, tornadoCenter, fallbackStartRadius);
+        tornadoEndRadius = Mathf.Clamp(tornadoEndRadius, 0f, activeStartRadius);
+        tornadoStart = centerPosition;
         tornadoHeight = Mathf.Max(0f, tornadoStart.y - groundY);
         tornadoElapsed = 0f;
-        tornadoHelperIndex = 0;
-        EnsureTornadoHelpers(startRotation);
+        EnsureTornadoHelpers();
 
-        float circumferenceDistance = Mathf.Max(0f, tornadoTurns) * 2f * Mathf.PI * Mathf.Max(0f, tornadoRadius);
+        float averageRadius = (Mathf.Max(0f, activeStartRadius) + Mathf.Max(0f, tornadoEndRadius)) * 0.5f;
+        float circumferenceDistance = Mathf.Max(0f, tornadoTurns) * 2f * Mathf.PI * averageRadius;
         float pathLength = Mathf.Sqrt(tornadoHeight * tornadoHeight + circumferenceDistance * circumferenceDistance);
-        float requestedDuration = pathLength / Mathf.Max(0.1f, tornadoMoveSpeed);
-        tornadoDuration = Mathf.Min(Mathf.Max(0.1f, requestedDuration), Mathf.Max(0.1f, tornadoMaxDuration));
+        float horizontalDuration = pathLength / Mathf.Max(0.1f, tornadoMoveSpeed);
+        tornadoDuration = Mathf.Max(0.1f, tornadoHeight / Mathf.Max(0.05f, tornadoDescendSpeed));
 
-        Debug.Log($"Boss tornado path is about {pathLength:F1}m and will take {tornadoDuration:F1}s.");
+        Debug.Log($"Boss tornado path is about {pathLength:F1}m. Vertical descent will take {tornadoDuration:F1}s. Horizontal path would take {horizontalDuration:F1}s at move speed {tornadoMoveSpeed:F2}m/s.");
     }
 
-    private void EnsureTornadoHelpers(Quaternion orientation)
+    private void EnsureTornadoHelpers()
     {
         if (tornadoHelperRoot == null)
         {
-            tornadoHelperRoot = CreateHelperRing(spawnPoint, Mathf.Max(0f, tornadoRadius), Mathf.Max(8, tornadoHelperCount));
+            tornadoHelperRoot = CreateHelperSpiral(spawnPoint, tornadoCenter, Mathf.Max(0f, activeStartRadius), Mathf.Max(0f, tornadoEndRadius), Mathf.Max(0f, tornadoTurns), groundY, Mathf.Max(8, tornadoHelperCount));
         }
 
-        tornadoHelperRoot.position = tornadoCenter;
-        tornadoHelperRoot.rotation = orientation;
         if (spawnPoint != null)
         {
             tornadoHelperRoot.SetParent(spawnPoint, true);
         }
+        tornadoHelperRoot.position = tornadoCenter;
+        tornadoHelperRoot.rotation = Quaternion.identity;
 
         int helperCount = Mathf.Max(8, tornadoHelperCount);
         while (tornadoHelperRoot.childCount < helperCount)
@@ -223,14 +260,17 @@ public class BossEnemy : MonoBehaviour
             helper.gameObject.SetActive(active);
             if (!active) continue;
 
-            float angle = i / (float)helperCount * Mathf.PI * 2f;
-            Vector3 localPosition = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * Mathf.Max(0f, tornadoRadius);
+            float t = helperCount <= 1 ? 1f : i / (float)(helperCount - 1);
+            float angle = Mathf.Max(0f, tornadoTurns) * Mathf.PI * 2f * t;
+            float radius = Mathf.Lerp(Mathf.Max(0f, activeStartRadius), Mathf.Max(0f, tornadoEndRadius), t);
+            Vector3 localPosition = (Mathf.Cos(angle) * tornadoRight + Mathf.Sin(angle) * tornadoForward) * radius;
+            localPosition.y = Mathf.Lerp(0f, groundY - tornadoCenter.y, t);
             helper.localPosition = localPosition;
             helper.localRotation = Quaternion.identity;
         }
     }
 
-    private static Transform CreateHelperRing(Transform center, float radius, int count)
+    private static Transform CreateHelperSpiral(Transform parent, Vector3 centerPosition, float startRadius, float endRadius, float turns, float groundY, int count)
     {
         GameObject root = GameObject.Find("Boss Tornado Path Helpers");
         if (root == null)
@@ -239,14 +279,26 @@ public class BossEnemy : MonoBehaviour
         }
 
         Transform rootTransform = root.transform;
-        if (center != null)
+        if (parent != null)
         {
-            rootTransform.SetParent(center, false);
+            rootTransform.SetParent(parent, true);
         }
 
-        rootTransform.localPosition = Vector3.zero;
-        rootTransform.localRotation = Quaternion.identity;
+        rootTransform.position = centerPosition;
+        rootTransform.rotation = Quaternion.identity;
         rootTransform.localScale = Vector3.one;
+
+        Vector3 startDirection = parent != null ? Vector3.ProjectOnPlane(parent.position - centerPosition, Vector3.up) : Vector3.right;
+        if (startDirection.sqrMagnitude <= 0.0001f)
+        {
+            startDirection = Vector3.right;
+        }
+        startDirection.Normalize();
+        Vector3 sideDirection = Vector3.Cross(Vector3.up, startDirection).normalized;
+        if (sideDirection.sqrMagnitude <= 0.0001f)
+        {
+            sideDirection = Vector3.forward;
+        }
 
         int helperCount = Mathf.Max(8, count);
         while (rootTransform.childCount < helperCount)
@@ -262,8 +314,12 @@ public class BossEnemy : MonoBehaviour
             helper.gameObject.SetActive(active);
             if (!active) continue;
 
-            float angle = i / (float)helperCount * Mathf.PI * 2f;
-            helper.localPosition = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * Mathf.Max(0f, radius);
+            float t = helperCount <= 1 ? 1f : i / (float)(helperCount - 1);
+            float angle = Mathf.Max(0f, turns) * Mathf.PI * 2f * t;
+            float radius = Mathf.Lerp(Mathf.Max(0f, startRadius), Mathf.Max(0f, endRadius), t);
+            Vector3 localPosition = (Mathf.Cos(angle) * startDirection + Mathf.Sin(angle) * sideDirection) * radius;
+            localPosition.y = Mathf.Lerp(0f, groundY - centerPosition.y, t);
+            helper.localPosition = localPosition;
             helper.localRotation = Quaternion.identity;
             helper.localScale = Vector3.one;
         }
@@ -271,28 +327,37 @@ public class BossEnemy : MonoBehaviour
         return rootTransform;
     }
 
-    private Vector3 ResolveCurrentHelperTarget(float y)
+    private Vector3 ResolveTornadoPosition(float t)
     {
-        if (tornadoHelperRoot == null || tornadoHelperRoot.childCount == 0)
-        {
-            float fallbackAngle = tornadoElapsed * tornadoMoveSpeed / Mathf.Max(0.1f, tornadoRadius);
-            Vector3 fallbackOffset = new Vector3(Mathf.Cos(fallbackAngle), 0f, Mathf.Sin(fallbackAngle)) * Mathf.Max(0f, tornadoRadius);
-            Vector3 fallbackPosition = tornadoCenter + fallbackOffset;
-            fallbackPosition.y = y;
-            return fallbackPosition;
-        }
-
-        int helperCount = Mathf.Max(1, Mathf.Min(tornadoHelperCount, tornadoHelperRoot.childCount));
-        int wrappedIndex = ((tornadoHelperIndex % helperCount) + helperCount) % helperCount;
-        Vector3 targetPosition = tornadoHelperRoot.GetChild(wrappedIndex).position;
-        targetPosition.y = y;
-        return targetPosition;
+        float angle = Mathf.Max(0f, tornadoTurns) * Mathf.PI * 2f * t;
+        float radius = Mathf.Lerp(Mathf.Max(0f, activeStartRadius), Mathf.Max(0f, tornadoEndRadius), t);
+        Vector3 horizontalOffset = (Mathf.Cos(angle) * tornadoRight + Mathf.Sin(angle) * tornadoForward) * radius;
+        Vector3 position = tornadoCenter + horizontalOffset;
+        position.y = Mathf.Lerp(tornadoStart.y, groundY, t);
+        return position;
     }
 
-    private void AdvanceTornadoHelper()
+    private static Vector3 ResolveArenaCenter(Vector3 referencePosition)
     {
-        int helperCount = tornadoHelperRoot != null ? Mathf.Max(1, Mathf.Min(tornadoHelperCount, tornadoHelperRoot.childCount)) : 1;
-        tornadoHelperIndex = (tornadoHelperIndex + 1) % helperCount;
+        GameObject centerObject = GameObject.Find("BossTornadoCenter")
+            ?? GameObject.Find("Boss Arena Center")
+            ?? GameObject.Find("Arena Center")
+            ?? GameObject.Find("Mitte");
+
+        if (centerObject != null)
+        {
+            Vector3 center = centerObject.transform.position;
+            center.y = referencePosition.y;
+            return center;
+        }
+
+        return new Vector3(0f, referencePosition.y, 0f);
+    }
+
+    private static float CalculateHorizontalRadius(Vector3 position, Vector3 center, float fallbackRadius)
+    {
+        Vector3 offset = Vector3.ProjectOnPlane(position - center, Vector3.up);
+        return offset.sqrMagnitude > 0.0001f ? offset.magnitude : Mathf.Max(0f, fallbackRadius);
     }
 
     private void FacePlayer()

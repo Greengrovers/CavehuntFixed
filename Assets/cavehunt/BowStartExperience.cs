@@ -43,16 +43,27 @@ public class BowStartExperience : MonoBehaviour
     private bool initialRigidbodyIsKinematic;
     private bool initialRigidbodyUseGravity;
     private bool initialPoseCached;
+    private GameObject respawnTemplate;
+    private bool isRespawnTemplate;
+    private string originalBowName;
+
+    private static readonly List<BowStartExperience> respawnTemplates = new List<BowStartExperience>();
+    private static bool creatingRespawnTemplate;
 
     private void Awake()
     {
+        if (isRespawnTemplate || creatingRespawnTemplate) return;
+
         grabInteractable = GetComponent<XRGrabInteractable>();
         bowRigidbody = GetComponent<Rigidbody>();
         CacheInitialState();
+        EnsureRespawnTemplate();
     }
 
     private void OnEnable()
     {
+        if (isRespawnTemplate || creatingRespawnTemplate) return;
+
         if (grabInteractable == null)
         {
             grabInteractable = GetComponent<XRGrabInteractable>();
@@ -77,6 +88,8 @@ public class BowStartExperience : MonoBehaviour
 
     private void Start()
     {
+        if (isRespawnTemplate) return;
+
         AttachPickupArrow();
         CreatePrompt();
     }
@@ -169,6 +182,15 @@ public class BowStartExperience : MonoBehaviour
         }
     }
 
+    private void DestroyPrompt()
+    {
+        if (promptObject == null) return;
+
+        Destroy(promptObject);
+        promptObject = null;
+        promptText = null;
+    }
+
     private bool WasDismissPressed()
     {
         bool keyboardYPressed = Keyboard.current != null && Keyboard.current.yKey.wasPressedThisFrame;
@@ -259,18 +281,14 @@ public class BowStartExperience : MonoBehaviour
 
     public void HideForPlayerDeath()
     {
+        if (isRespawnTemplate) return;
+
         CacheInitialState();
+        EnsureRespawnTemplate();
         encounterStarted = false;
-        DismissPrompt();
+        DestroyPrompt();
         RemovePickupArrow();
         StopEnemiesUntilBowPickup();
-
-        if (bowRigidbody != null)
-        {
-            bowRigidbody.linearVelocity = Vector3.zero;
-            bowRigidbody.angularVelocity = Vector3.zero;
-            bowRigidbody.isKinematic = true;
-        }
 
         if (grabInteractable != null)
         {
@@ -278,50 +296,16 @@ public class BowStartExperience : MonoBehaviour
         }
 
         gameObject.SetActive(false);
+        Destroy(gameObject);
     }
 
     public void ResetForRetry()
     {
-        CacheInitialState();
-        StopEnemiesUntilBowPickup();
+        if (isRespawnTemplate) return;
 
-        if (initialParent != null)
-        {
-            transform.SetParent(initialParent, false);
-        }
-
-        transform.localPosition = initialLocalPosition;
-        transform.localRotation = initialLocalRotation;
-        transform.localScale = initialLocalScale;
-
-        if (bowRigidbody == null)
-        {
-            bowRigidbody = GetComponent<Rigidbody>();
-        }
-
-        if (bowRigidbody != null)
-        {
-            bowRigidbody.linearVelocity = Vector3.zero;
-            bowRigidbody.angularVelocity = Vector3.zero;
-            bowRigidbody.isKinematic = initialRigidbodyIsKinematic;
-            bowRigidbody.useGravity = initialRigidbodyUseGravity;
-        }
-
-        encounterStarted = false;
-        gameObject.SetActive(true);
-
-        if (grabInteractable == null)
-        {
-            grabInteractable = GetComponent<XRGrabInteractable>();
-        }
-
-        if (grabInteractable != null)
-        {
-            grabInteractable.enabled = true;
-        }
-
-        AttachPickupArrow();
-        ResetPrompt();
+        EnsureRespawnTemplate();
+        HideForPlayerDeath();
+        SpawnAllBowsFromTemplates();
     }
 
     public static void HideAllBowsForPlayerDeath()
@@ -341,11 +325,22 @@ public class BowStartExperience : MonoBehaviour
         BowStartExperience[] bows = FindObjectsByType<BowStartExperience>(FindObjectsInactive.Include);
         for (int i = 0; i < bows.Length; i++)
         {
-            if (bows[i] != null)
+            if (bows[i] != null && !bows[i].isRespawnTemplate)
             {
-                bows[i].ResetForRetry();
+                bows[i].EnsureRespawnTemplate();
             }
         }
+
+        bows = FindObjectsByType<BowStartExperience>(FindObjectsInactive.Include);
+        for (int i = 0; i < bows.Length; i++)
+        {
+            if (bows[i] != null && !bows[i].isRespawnTemplate)
+            {
+                bows[i].HideForPlayerDeath();
+            }
+        }
+
+        SpawnAllBowsFromTemplates();
     }
 
     private void CacheInitialState()
@@ -356,6 +351,7 @@ public class BowStartExperience : MonoBehaviour
         initialLocalPosition = transform.localPosition;
         initialLocalRotation = transform.localRotation;
         initialLocalScale = transform.localScale;
+        originalBowName = gameObject.name;
 
         if (bowRigidbody == null)
         {
@@ -369,6 +365,117 @@ public class BowStartExperience : MonoBehaviour
         }
 
         initialPoseCached = true;
+    }
+
+    private void EnsureRespawnTemplate()
+    {
+        if (isRespawnTemplate || creatingRespawnTemplate) return;
+        if (respawnTemplate != null) return;
+
+        CacheInitialState();
+
+        creatingRespawnTemplate = true;
+        GameObject templateObject = Instantiate(gameObject, initialParent);
+        templateObject.name = $"{gameObject.name} Respawn Template";
+        templateObject.SetActive(false);
+
+        BowStartExperience template = templateObject.GetComponent<BowStartExperience>();
+        if (template != null)
+        {
+            template.isRespawnTemplate = true;
+            template.respawnTemplate = templateObject;
+            template.originalBowName = string.IsNullOrEmpty(originalBowName) ? gameObject.name : originalBowName;
+            template.initialParent = initialParent;
+            template.initialLocalPosition = initialLocalPosition;
+            template.initialLocalRotation = initialLocalRotation;
+            template.initialLocalScale = initialLocalScale;
+            template.initialRigidbodyIsKinematic = initialRigidbodyIsKinematic;
+            template.initialRigidbodyUseGravity = initialRigidbodyUseGravity;
+            template.initialPoseCached = true;
+            RegisterRespawnTemplate(template);
+        }
+
+        respawnTemplate = templateObject;
+        creatingRespawnTemplate = false;
+    }
+
+    private static void RegisterRespawnTemplate(BowStartExperience template)
+    {
+        if (template == null) return;
+        if (!respawnTemplates.Contains(template))
+        {
+            respawnTemplates.Add(template);
+        }
+    }
+
+    private static void SpawnAllBowsFromTemplates()
+    {
+        List<BowStartExperience> templates = CollectRespawnTemplates();
+        for (int i = 0; i < templates.Count; i++)
+        {
+            SpawnBowFromTemplate(templates[i]);
+        }
+    }
+
+    private static List<BowStartExperience> CollectRespawnTemplates()
+    {
+        respawnTemplates.RemoveAll(template => template == null);
+
+        BowStartExperience[] bows = FindObjectsByType<BowStartExperience>(FindObjectsInactive.Include);
+        for (int i = 0; i < bows.Length; i++)
+        {
+            BowStartExperience bow = bows[i];
+            if (bow == null || !bow.isRespawnTemplate) continue;
+
+            RegisterRespawnTemplate(bow);
+        }
+
+        return new List<BowStartExperience>(respawnTemplates);
+    }
+
+    private static void SpawnBowFromTemplate(BowStartExperience template)
+    {
+        if (template == null) return;
+
+        GameObject spawnedObject = Instantiate(template.gameObject, template.initialParent);
+        spawnedObject.name = string.IsNullOrWhiteSpace(template.originalBowName)
+            ? template.gameObject.name.Replace(" Respawn Template", string.Empty)
+            : template.originalBowName;
+
+        BowStartExperience spawnedBow = spawnedObject.GetComponent<BowStartExperience>();
+        if (spawnedBow != null)
+        {
+            spawnedBow.CopyRespawnStateFromTemplate(template);
+        }
+
+        spawnedObject.SetActive(true);
+    }
+
+    private void CopyRespawnStateFromTemplate(BowStartExperience template)
+    {
+        isRespawnTemplate = false;
+        respawnTemplate = template != null ? template.gameObject : null;
+        originalBowName = template != null ? template.originalBowName : gameObject.name;
+
+        if (template != null)
+        {
+            initialParent = template.initialParent;
+            initialLocalPosition = template.initialLocalPosition;
+            initialLocalRotation = template.initialLocalRotation;
+            initialLocalScale = template.initialLocalScale;
+            initialRigidbodyIsKinematic = template.initialRigidbodyIsKinematic;
+            initialRigidbodyUseGravity = template.initialRigidbodyUseGravity;
+        }
+
+        initialPoseCached = true;
+        transform.SetParent(initialParent, false);
+        transform.localPosition = initialLocalPosition;
+        transform.localRotation = initialLocalRotation;
+        transform.localScale = initialLocalScale;
+
+        grabInteractable = GetComponent<XRGrabInteractable>();
+        bowRigidbody = GetComponent<Rigidbody>();
+        encounterStarted = false;
     }
 
     private void ResetPrompt()

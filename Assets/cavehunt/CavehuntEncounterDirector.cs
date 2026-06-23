@@ -6,6 +6,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
     private enum EncounterPhase
     {
         WaitingForBow,
+        DifficultySelection,
         Tutorial,
         RingFight,
         Boss,
@@ -24,7 +25,9 @@ public class CavehuntEncounterDirector : MonoBehaviour
     [SerializeField, Range(0.05f, 0.95f)] private float innerRingInwardProjection = 0.55f;
     [SerializeField, Min(0.1f)] private float outerRingSpawnInterval = 3f;
     [SerializeField, Min(0.1f)] private float innerRingSpawnInterval = 4f;
+    [SerializeField, Min(0)] private int minActiveOuterRingBats = 1;
     [SerializeField, Min(0)] private int maxActiveOuterRingBats = 3;
+    [SerializeField, Min(0)] private int minActiveInnerRingBats = 1;
     [SerializeField, Min(0)] private int maxActiveInnerRingBats = 2;
 
     [Header("Boss")]
@@ -36,6 +39,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
     [SerializeField] private UnityEvent onVictory;
 
     private CavehuntDifficultySettings difficultySettings;
+    private CavehuntDifficultySelector difficultySelector;
     private EncounterPhase phase = EncounterPhase.WaitingForBow;
     private int tutorialKills;
     private int outerRingKills;
@@ -57,13 +61,39 @@ public class CavehuntEncounterDirector : MonoBehaviour
         tutorialKills = 0;
         outerRingKills = 0;
         innerRingKills = 0;
+        phase = EncounterPhase.DifficultySelection;
+
+        StopRingSpawners();
+        PrepareBoss();
+
+        if (difficultySelector != null)
+        {
+            difficultySelector.ShowSelection(this, difficultySettings);
+            Debug.Log("Cavehunt encounter waiting for difficulty selection.");
+            return;
+        }
+
+        SelectDifficulty(0);
+    }
+
+    public void SelectDifficulty(int profileIndex)
+    {
+        ResolveReferences();
+
+        int selectedIndex = difficultySettings != null ? difficultySettings.SelectProfile(profileIndex) : 0;
+        ApplySelectedDifficulty();
+
+        tutorialKills = 0;
+        outerRingKills = 0;
+        innerRingKills = 0;
         phase = EncounterPhase.Tutorial;
 
         StopRingSpawners();
         PrepareBoss();
         BeginTutorialEnemies();
 
-        Debug.Log("Cavehunt encounter started: Tutorial phase.");
+        string difficultyName = difficultySettings != null ? difficultySettings.GetProfile(selectedIndex).DisplayName : "Default";
+        Debug.Log($"Cavehunt encounter started: {difficultyName} difficulty.");
     }
 
     public void ResetForBowPickup()
@@ -78,6 +108,10 @@ public class CavehuntEncounterDirector : MonoBehaviour
         ResetEnemiesByRole(CavehuntEnemyRole.Tutorial);
         StopRingSpawners();
         PrepareBoss();
+        if (difficultySelector != null)
+        {
+            difficultySelector.HideSelection();
+        }
     }
 
     public void ReportEnemyDefeated(CavehuntEnemyRole role, CavehuntEnemyKillTracker tracker)
@@ -127,10 +161,31 @@ public class CavehuntEncounterDirector : MonoBehaviour
     private void ResolveReferences()
     {
         difficultySettings = CavehuntDifficultySettings.Resolve();
+        ResolveDifficultySelector();
         ResolveOuterRingSpawner();
         ResolveInnerRingSpawner();
         ResolveBossEnemy();
         ResolveBossSpawnPoint();
+    }
+
+    private void ResolveDifficultySelector()
+    {
+        if (difficultySelector != null) return;
+
+        difficultySelector = FindAnyObjectByType<CavehuntDifficultySelector>(FindObjectsInactive.Include);
+        if (difficultySelector != null) return;
+
+        GameObject selectorObject = GameObject.Find("Cavehunt Difficulty Selector");
+        if (selectorObject == null)
+        {
+            selectorObject = new GameObject("Cavehunt Difficulty Selector");
+        }
+
+        difficultySelector = selectorObject.GetComponent<CavehuntDifficultySelector>();
+        if (difficultySelector == null)
+        {
+            difficultySelector = selectorObject.AddComponent<CavehuntDifficultySelector>();
+        }
     }
 
     private void ResolveOuterRingSpawner()
@@ -173,6 +228,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
             innerRingSpawnPointStep,
             innerRingInwardProjection,
             innerRingSpawnInterval,
+            minActiveInnerRingBats,
             maxActiveInnerRingBats,
             innerRingKillsToBoss
         );
@@ -243,6 +299,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
                 1,
                 0f,
                 outerRingSpawnInterval,
+                minActiveOuterRingBats,
                 maxActiveOuterRingBats,
                 outerRingKillsToBoss
             );
@@ -293,15 +350,63 @@ public class CavehuntEncounterDirector : MonoBehaviour
         }
     }
 
+    private void ApplySelectedDifficulty()
+    {
+        if (difficultySettings == null) return;
+
+        outerRingKillsToBoss = difficultySettings.OuterRingKillsToBoss;
+        innerRingKillsToBoss = difficultySettings.InnerRingKillsToBoss;
+        minActiveOuterRingBats = difficultySettings.MinActiveOuterRingBats;
+        maxActiveOuterRingBats = difficultySettings.MaxActiveOuterRingBats;
+        minActiveInnerRingBats = difficultySettings.MinActiveInnerRingBats;
+        maxActiveInnerRingBats = difficultySettings.MaxActiveInnerRingBats;
+
+        PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>(FindObjectsInactive.Include);
+        if (playerHealth != null)
+        {
+            playerHealth.SetMaxHealth(difficultySettings.PlayerMaxHealth);
+        }
+
+        ApplyDifficultyToExistingEnemies();
+        if (bossEnemy != null)
+        {
+            bossEnemy.SetDescendSpeed(difficultySettings.BossDescendSpeed);
+        }
+
+        ResolveInnerRingSpawner();
+    }
+
+    private void ApplyDifficultyToExistingEnemies()
+    {
+        CavehuntEnemyKillTracker[] trackers = FindObjectsByType<CavehuntEnemyKillTracker>(FindObjectsInactive.Include);
+        for (int i = 0; i < trackers.Length; i++)
+        {
+            CavehuntEnemyKillTracker tracker = trackers[i];
+            if (tracker == null) continue;
+
+            Damageable damageable = tracker.GetComponent<Damageable>();
+            difficultySettings.ApplyHealthTo(damageable, tracker.Role);
+
+            BatEnemy enemy = tracker.GetComponent<BatEnemy>();
+            if (enemy != null)
+            {
+                enemy.SetDescendSpeed(difficultySettings.BatDescendSpeed);
+            }
+        }
+    }
+
     private void CompleteVictory()
     {
         if (phase == EncounterPhase.Victory) return;
 
         phase = EncounterPhase.Victory;
         StopRingSpawners();
+        CavehuntRuntimeCleanup.DestroyGameplayLeftovers();
         PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>(FindObjectsInactive.Include);
         if (playerHealth != null)
         {
+            playerHealth.ClearDamageFlash();
+            BowStartExperience.HideAllBowsForPlayerDeath();
             playerHealth.ShowGameWonMenu();
         }
 

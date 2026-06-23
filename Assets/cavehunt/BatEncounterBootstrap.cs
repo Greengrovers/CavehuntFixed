@@ -9,6 +9,8 @@ public static class BatEncounterBootstrap
     private const float BatBulletDamage = 1f;
     private const float BossBulletDamageMultiplier = 2f;
     private const float BossBulletSize = 1.8f;
+    private const float BossTornadoEndRadius = 1.5f;
+    private const int BossTornadoHelperCount = 24;
     private const float FallbackCeilingHeightAbovePlayer = 7f;
     private const float MinimumCeilingHeightAbovePlayer = 5.5f;
     private const float MaximumCeilingHeightAbovePlayer = 9f;
@@ -119,6 +121,7 @@ public static class BatEncounterBootstrap
             : EnsureBulletSpawnPoint(bat.transform);
         batEnemy.SetPreferredSpawnIndex(spawnOffset);
         batEnemy.SetRespawnOnDeath(false);
+        batEnemy.SetDescendSpeed(difficultySettings.BatDescendSpeed);
         batEnemy.ApplyEncounterTuning(BatShootInterval, BatBulletSpeed, BatBulletDamage);
         batEnemy.Configure(playerTarget, bulletSpawn, spawnPoints, bulletMaterial, playerHealth);
 
@@ -178,6 +181,8 @@ public static class BatEncounterBootstrap
         {
             bossEnemy = boss.AddComponent<BossEnemy>();
         }
+        bossEnemy.ConfigureTornadoPath(BossTornadoEndRadius, BossTornadoHelperCount);
+        bossEnemy.SetDescendSpeed(difficultySettings.BossDescendSpeed);
         bossEnemy.ApplyDifficulty(difficultySettings);
 
         EnemyHealthBar healthBar = boss.GetComponent<EnemyHealthBar>();

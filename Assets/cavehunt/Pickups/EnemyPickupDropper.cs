@@ -104,6 +104,7 @@ public class EnemyPickupDropper : MonoBehaviour
         GameObject prefab = validPrefabs[Random.Range(0, validPrefabs.Count)];
         Vector3 spawnPosition = ResolveDropPosition(enemyPosition);
         GameObject pickup = Instantiate(prefab, spawnPosition, Quaternion.identity);
+        CavehuntRuntimeCleanup.Mark(pickup, CavehuntRuntimeCleanup.CleanupKind.Pickup);
 
         PickupDropAnimation dropAnimation = pickup.GetComponent<PickupDropAnimation>();
         if (dropAnimation != null)
@@ -285,6 +286,7 @@ public class EnemyPickupDropper : MonoBehaviour
 
         GameObject trapObject = Instantiate(template, trapPosition, trapRotation);
         trapObject.name = "Spike Trap";
+        CavehuntRuntimeCleanup.Mark(trapObject, CavehuntRuntimeCleanup.CleanupKind.Trap);
         trapObject.SetActive(true);
 
         SpikeTrap trap = trapObject.GetComponent<SpikeTrap>();
@@ -323,6 +325,7 @@ public class EnemyPickupDropper : MonoBehaviour
 
         GameObject geodeObject = Instantiate(template, geodePosition, geodeRotation);
         geodeObject.name = "Geode Boundary Healing";
+        CavehuntRuntimeCleanup.Mark(geodeObject, CavehuntRuntimeCleanup.CleanupKind.Pickup);
         geodeObject.SetActive(true);
 
         HealingGeode healingGeode = geodeObject.GetComponent<HealingGeode>();

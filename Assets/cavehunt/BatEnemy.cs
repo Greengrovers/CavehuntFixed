@@ -109,6 +109,11 @@ public class BatEnemy : MonoBehaviour
         descendTowardGround = enabled;
     }
 
+    public void SetDescendSpeed(float speed)
+    {
+        descendSpeed = Mathf.Max(0.05f, speed);
+    }
+
     public void SetRespawnOnDeath(bool enabled)
     {
         respawnOnDeath = enabled;
