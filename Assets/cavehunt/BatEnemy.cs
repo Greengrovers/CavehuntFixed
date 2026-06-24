@@ -19,6 +19,14 @@ public class BatEnemy : MonoBehaviour
     [SerializeField] private bool descendTowardGround = true;
     [SerializeField] private bool respawnOnDeath = true;
 
+    [Header("Near Ground Sound")]
+    [SerializeField] private bool playNearGroundSound = true;
+    [SerializeField] private string nearGroundSoundResourcePath = "Audio/BatCaveSound";
+    [SerializeField] private float nearGroundSoundHeight = 16f;
+    [SerializeField, Range(0f, 2f)] private float nearGroundSoundVolume = 1.8f;
+    [SerializeField] private float nearGroundSoundMinDistance = 2f;
+    [SerializeField] private float nearGroundSoundMaxDistance = 80f;
+
     [Header("Spawn")]
     [SerializeField] private float minPlayerSpawnDistance = 1.5f;
     [SerializeField] private float spawnPositionJitter = 0.35f;
@@ -52,6 +60,9 @@ public class BatEnemy : MonoBehaviour
     private int nextEyeSpawnIndex;
     private bool encounterStarted;
     private bool presentationStateCached;
+    private AudioSource nearGroundAudioSource;
+    private bool nearGroundSoundPlayed;
+    private static AudioClip cachedNearGroundClip;
 
     public bool IsPresenting => (!waitForBowPickup || encounterStarted) && !waitingForRespawn;
     public Transform BulletSpawnPoint => bulletSpawnPoint;
@@ -172,6 +183,7 @@ public class BatEnemy : MonoBehaviour
         gameObject.SetActive(true);
         CachePresentationComponents();
         SetPresentationActive(false);
+        nearGroundSoundPlayed = false;
     }
     private void Awake()
     {
@@ -239,6 +251,7 @@ public class BatEnemy : MonoBehaviour
         {
             MoveTowardGround();
         }
+        PlayNearGroundSoundIfNeeded();
         ShootAtPlayer();
     }
 
@@ -329,6 +342,7 @@ public class BatEnemy : MonoBehaviour
         transform.position = spawnPosition;
         transform.rotation = ResolveSpawnRotation(spawnPoint, spawnPosition);
         lastSpawnIndex = spawnIndex;
+        nearGroundSoundPlayed = false;
 
         float minFirstShotDelay = Mathf.Max(0f, Mathf.Min(firstShotDelayMultiplierRange.x, firstShotDelayMultiplierRange.y));
         float maxFirstShotDelay = Mathf.Max(minFirstShotDelay, Mathf.Max(firstShotDelayMultiplierRange.x, firstShotDelayMultiplierRange.y));
@@ -344,6 +358,54 @@ public class BatEnemy : MonoBehaviour
         {
             health.TakeDamage(amount);
         }
+    }
+
+    private void PlayNearGroundSoundIfNeeded()
+    {
+        if (!playNearGroundSound || nearGroundSoundPlayed) return;
+        if (transform.position.y > groundY + Mathf.Max(0f, nearGroundSoundHeight)) return;
+
+        AudioClip clip = ResolveNearGroundClip();
+        if (clip == null) return;
+
+        AudioSource audioSource = ResolveNearGroundAudioSource();
+        if (audioSource == null) return;
+
+        nearGroundSoundPlayed = true;
+        audioSource.PlayOneShot(clip, nearGroundSoundVolume);
+    }
+
+    private AudioSource ResolveNearGroundAudioSource()
+    {
+        if (nearGroundAudioSource != null) return nearGroundAudioSource;
+
+        nearGroundAudioSource = GetComponent<AudioSource>();
+        if (nearGroundAudioSource == null)
+        {
+            nearGroundAudioSource = gameObject.AddComponent<AudioSource>();
+        }
+
+        nearGroundAudioSource.playOnAwake = false;
+        nearGroundAudioSource.spatialBlend = 1f;
+        nearGroundAudioSource.rolloffMode = AudioRolloffMode.Logarithmic;
+        nearGroundAudioSource.minDistance = Mathf.Max(0.1f, nearGroundSoundMinDistance);
+        nearGroundAudioSource.maxDistance = Mathf.Max(nearGroundAudioSource.minDistance + 0.1f, nearGroundSoundMaxDistance);
+        nearGroundAudioSource.dopplerLevel = 0.35f;
+        return nearGroundAudioSource;
+    }
+
+    private AudioClip ResolveNearGroundClip()
+    {
+        if (cachedNearGroundClip != null) return cachedNearGroundClip;
+        if (string.IsNullOrWhiteSpace(nearGroundSoundResourcePath)) return null;
+
+        cachedNearGroundClip = Resources.Load<AudioClip>(nearGroundSoundResourcePath);
+        if (cachedNearGroundClip == null)
+        {
+            Debug.LogWarning($"Bat near-ground sound not found at Resources/{nearGroundSoundResourcePath}.", this);
+        }
+
+        return cachedNearGroundClip;
     }
 
     private void HandleDeath()

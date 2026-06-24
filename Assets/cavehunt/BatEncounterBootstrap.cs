@@ -52,6 +52,25 @@ public static class BatEncounterBootstrap
         encounterDirector.ResetForBowPickup();
     }
 
+    public static BossEnemy EnsureBossEnemyExists(CavehuntEncounterDirector encounterDirector)
+    {
+        GameObject templateBat = ResolveTemplateBat();
+        if (templateBat == null) return null;
+
+        CavehuntDifficultySettings difficultySettings = CavehuntDifficultySettings.Resolve();
+        Transform playerTarget = FindPlayerTarget();
+        PlayerHealth playerHealth = EnsurePlayerHealth(playerTarget);
+        Transform[] spawnPoints = EnsureCeilingSpawnPoints(templateBat.transform, playerTarget);
+        Material bulletMaterial = CreateRedBulletMaterial();
+
+        float batScaleMultiplier = difficultySettings != null ? difficultySettings.BatScaleMultiplier : 1f;
+        Vector3 baseScale = batScaleMultiplier > 0.001f
+            ? templateBat.transform.localScale / batScaleMultiplier
+            : templateBat.transform.localScale;
+
+        return EnsureBossEnemy(templateBat, playerTarget, playerHealth, spawnPoints, bulletMaterial, baseScale, difficultySettings, encounterDirector);
+    }
+
     private static GameObject[] EnsureBatEnemies(GameObject templateBat, int enemyCount)
     {
         GameObject[] bats = new GameObject[enemyCount];
@@ -121,7 +140,7 @@ public static class BatEncounterBootstrap
             : EnsureBulletSpawnPoint(bat.transform);
         batEnemy.SetPreferredSpawnIndex(spawnOffset);
         batEnemy.SetRespawnOnDeath(false);
-        batEnemy.SetDescendSpeed(difficultySettings.BatDescendSpeed);
+        batEnemy.SetDescendSpeed(difficultySettings.TutorialBatDescendSpeed);
         batEnemy.ApplyEncounterTuning(BatShootInterval, BatBulletSpeed, BatBulletDamage);
         batEnemy.Configure(playerTarget, bulletSpawn, spawnPoints, bulletMaterial, playerHealth);
 
@@ -141,9 +160,11 @@ public static class BatEncounterBootstrap
     }
 
 
-    private static void EnsureBossEnemy(GameObject templateBat, Transform playerTarget, PlayerHealth playerHealth, Transform[] spawnPoints, Material bulletMaterial, Vector3 baseScale, CavehuntDifficultySettings difficultySettings, CavehuntEncounterDirector encounterDirector)
+    private static BossEnemy EnsureBossEnemy(GameObject templateBat, Transform playerTarget, PlayerHealth playerHealth, Transform[] spawnPoints, Material bulletMaterial, Vector3 baseScale, CavehuntDifficultySettings difficultySettings, CavehuntEncounterDirector encounterDirector)
     {
-        GameObject boss = GameObject.Find("Boss Bat");
+        if (templateBat == null || difficultySettings == null) return null;
+
+        GameObject boss = FindGameObjectByNameIncludingInactive("Boss Bat");
         if (boss == null)
         {
             boss = UnityEngine.Object.Instantiate(templateBat);
@@ -213,6 +234,48 @@ public static class BatEncounterBootstrap
             killTracker = boss.AddComponent<CavehuntEnemyKillTracker>();
         }
         killTracker.Configure(CavehuntEnemyRole.Boss, encounterDirector);
+
+        return bossEnemy;
+    }
+
+    private static GameObject ResolveTemplateBat()
+    {
+        GameObject namedBat = FindGameObjectByNameIncludingInactive("Bat");
+        if (namedBat != null) return namedBat;
+
+        BatEnemy[] enemies = UnityEngine.Object.FindObjectsByType<BatEnemy>(FindObjectsInactive.Include);
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            BatEnemy enemy = enemies[i];
+            if (enemy == null) continue;
+            if (enemy.GetComponent<BossEnemy>() != null) continue;
+
+            CavehuntEnemyKillTracker tracker = enemy.GetComponent<CavehuntEnemyKillTracker>();
+            if (tracker != null && tracker.Role == CavehuntEnemyRole.Boss) continue;
+
+            return enemy.gameObject;
+        }
+
+        return null;
+    }
+
+    private static GameObject FindGameObjectByNameIncludingInactive(string objectName)
+    {
+        if (string.IsNullOrWhiteSpace(objectName)) return null;
+
+        GameObject activeObject = GameObject.Find(objectName);
+        if (activeObject != null) return activeObject;
+
+        Transform[] transforms = Resources.FindObjectsOfTypeAll<Transform>();
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform candidate = transforms[i];
+            if (candidate == null || candidate.name != objectName) continue;
+            if (!candidate.gameObject.scene.IsValid()) continue;
+            return candidate.gameObject;
+        }
+
+        return null;
     }
     private static Transform FindPlayerTarget()
     {

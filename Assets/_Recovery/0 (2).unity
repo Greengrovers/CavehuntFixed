@@ -819,7 +819,7 @@ Transform:
   m_GameObject: {fileID: 426695530}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 112.5}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2358,16 +2358,16 @@ BoxCollider:
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 0
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.59, y: 2, z: 5}
+  m_Size: {x: 0, y: 2, z: 5}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1001 &785514113
 PrefabInstance:
@@ -2743,58 +2743,55 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CavehuntDifficultySettings
   selectedProfileIndex: 1
   profiles:
+  - displayName: Easy
+    targetColor: {r: 0.25, g: 0.9, b: 0.35, a: 1}
+    playerMaxHealth: 7
+    batMaxHealth: 2
+    innerRingBatMaxHealth: 4
+    bossMaxHealth: 18
+    batDescendSpeed: 1
+    bossDescendSpeed: 0.7
+    batScaleMultiplier: 1
+    innerRingBatScaleMultiplier: 1.2
+    bossScaleMultiplier: 5
+    minActiveOuterRingBats: 1
+    maxActiveOuterRingBats: 3
+    minActiveInnerRingBats: 1
+    maxActiveInnerRingBats: 2
+    outerRingKillsToBoss: 1
+    innerRingKillsToBoss: 1
   - displayName: Normal
     targetColor: {r: 1, g: 0.86, b: 0.2, a: 1}
     playerMaxHealth: 5
     batMaxHealth: 3
     innerRingBatMaxHealth: 6
-    bossMaxHealth: 36
-    batDescendSpeed: 0.8
-    tutorialBatDescendSpeed: 0.8
+    bossMaxHealth: 25
+    batDescendSpeed: 1.5
     bossDescendSpeed: 0.9
     batScaleMultiplier: 1.1
     innerRingBatScaleMultiplier: 1.35
     bossScaleMultiplier: 5
-    minActiveOuterRingBats: 3
-    maxActiveOuterRingBats: 8
-    minActiveInnerRingBats: 3
-    maxActiveInnerRingBats: 7
+    minActiveOuterRingBats: 1
+    maxActiveOuterRingBats: 3
+    minActiveInnerRingBats: 1
+    maxActiveInnerRingBats: 2
     outerRingKillsToBoss: 14
     innerRingKillsToBoss: 7
-  - displayName: Easy
-    targetColor: {r: 0.25, g: 0.9, b: 0.35, a: 1}
-    playerMaxHealth: 7
-    batMaxHealth: 2
-    innerRingBatMaxHealth: 3
-    bossMaxHealth: 18
-    batDescendSpeed: 1
-    tutorialBatDescendSpeed: 0.65
-    bossDescendSpeed: 0.7
-    batScaleMultiplier: 1
-    innerRingBatScaleMultiplier: 1.2
-    bossScaleMultiplier: 5
-    minActiveOuterRingBats: 5
-    maxActiveOuterRingBats: 10
-    minActiveInnerRingBats: 3
-    maxActiveInnerRingBats: 5
-    outerRingKillsToBoss: 10
-    innerRingKillsToBoss: 8
   - displayName: Hard
     targetColor: {r: 1, g: 0.25, b: 0.18, a: 1}
-    playerMaxHealth: 5
-    batMaxHealth: 4
-    innerRingBatMaxHealth: 6
-    bossMaxHealth: 45
+    playerMaxHealth: 4
+    batMaxHealth: 5
+    innerRingBatMaxHealth: 9
+    bossMaxHealth: 40
     batDescendSpeed: 2.1
-    tutorialBatDescendSpeed: 0.9
-    bossDescendSpeed: 0.8
+    bossDescendSpeed: 1.2
     batScaleMultiplier: 1.15
     innerRingBatScaleMultiplier: 1.45
     bossScaleMultiplier: 5
-    minActiveOuterRingBats: 4
-    maxActiveOuterRingBats: 10
-    minActiveInnerRingBats: 3
-    maxActiveInnerRingBats: 6
+    minActiveOuterRingBats: 2
+    maxActiveOuterRingBats: 5
+    minActiveInnerRingBats: 1
+    maxActiveInnerRingBats: 3
     outerRingKillsToBoss: 18
     innerRingKillsToBoss: 9
 --- !u!4 &925325829
@@ -2910,16 +2907,16 @@ BoxCollider:
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 0
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.5, y: 2, z: 5}
+  m_Size: {x: 0, y: 2, z: 5}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1016262714
 GameObject:
@@ -3364,16 +3361,16 @@ BoxCollider:
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
-    m_Bits: 128
+    m_Bits: 0
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
   m_LayerOverridePriority: 0
-  m_IsTrigger: 1
+  m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.53, y: 2, z: 5}
+  m_Size: {x: 0, y: 2, z: 5}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1115622675
 GameObject:
@@ -4395,8 +4392,8 @@ MonoBehaviour:
   respawnOnDeath: 1
   playNearGroundSound: 1
   nearGroundSoundResourcePath: Audio/BatCaveSound
-  nearGroundSoundHeight: 16
-  nearGroundSoundVolume: 1.8
+  nearGroundSoundHeight: 8
+  nearGroundSoundVolume: 0.9
   nearGroundSoundMinDistance: 2
   nearGroundSoundMaxDistance: 80
   minPlayerSpawnDistance: 1.5

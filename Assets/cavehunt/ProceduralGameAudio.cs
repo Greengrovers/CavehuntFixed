@@ -6,12 +6,18 @@ public class ProceduralGameAudio : MonoBehaviour
 
     [SerializeField, Range(0f, 1f)] private float musicVolume = 0.234f;
     [SerializeField] private string externalMusicResourcePath = "Audio/Music/gravity_breaker_power_ambition_synthrock";
+    [SerializeField] private string bossMusicResourcePath = "Audio/Music/boss_battle_arkpiercer";
+    [SerializeField, Range(0f, 1f)] private float bossMusicVolume = 0.36f;
+    [SerializeField] private string gameWonMusicResourcePath = "Audio/Music/level_won";
+    [SerializeField, Range(0f, 1f)] private float gameWonMusicVolume = 0.62f;
     [SerializeField, Range(0f, 1f)] private float sfxVolume = 0.75f;
 
     private static ProceduralGameAudio instance;
 
     private AudioSource musicSource;
     private AudioClip musicClip;
+    private AudioClip bossMusicClip;
+    private AudioClip gameWonMusicClip;
     private AudioClip airPickupClip;
     private AudioClip pickupClip;
     private AudioClip bowReadyClip;
@@ -62,6 +68,44 @@ public class ProceduralGameAudio : MonoBehaviour
         audio.PlayAt(position, audio.trapClip ??= audio.CreateTrapClip(), 0.9f, 0.85f);
     }
 
+    public static void StartBossMusic()
+    {
+        try
+        {
+            EnsureInstance().SwitchToBossMusic();
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogWarning($"Boss music could not start: {exception.Message}");
+        }
+    }
+
+    public static void StartGameWonMusic()
+    {
+        try
+        {
+            EnsureInstance().SwitchToGameWonMusic();
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogWarning($"Game won music could not start: {exception.Message}");
+        }
+    }
+
+    public static void StopBossMusic(bool resumeDefaultMusic = true)
+    {
+        if (instance == null) return;
+
+        try
+        {
+            instance.StopBossMusicInternal(resumeDefaultMusic);
+        }
+        catch (System.Exception exception)
+        {
+            Debug.LogWarning($"Boss music could not stop cleanly: {exception.Message}");
+        }
+    }
+
     private static ProceduralGameAudio EnsureInstance()
     {
         if (instance != null) return instance;
@@ -93,27 +137,114 @@ public class ProceduralGameAudio : MonoBehaviour
 
     private void StartMusic()
     {
-        if (musicSource == null)
-        {
-            musicSource = gameObject.AddComponent<AudioSource>();
-            musicSource.loop = true;
-            musicSource.playOnAwake = false;
-            musicSource.spatialBlend = 0f;
-            musicSource.volume = musicVolume;
-        }
+        EnsureMusicSource();
 
         if (musicSource.isPlaying) return;
 
         musicClip ??= LoadExternalMusicClip();
         musicClip ??= CreatePowerRockLoop();
+        musicSource.ignoreListenerPause = false;
         musicSource.clip = musicClip;
         musicSource.Play();
+    }
+
+    private void SwitchToBossMusic()
+    {
+        EnsureMusicSource();
+
+        bossMusicClip ??= LoadBossMusicClip();
+        if (bossMusicClip == null) return;
+
+        if (musicSource.clip == bossMusicClip && musicSource.isPlaying) return;
+
+        musicSource.Stop();
+        musicSource.ignoreListenerPause = false;
+        musicSource.clip = bossMusicClip;
+        musicSource.volume = bossMusicVolume;
+        musicSource.loop = true;
+        musicSource.Play();
+    }
+
+    private void SwitchToGameWonMusic()
+    {
+        EnsureMusicSource();
+
+        gameWonMusicClip ??= LoadGameWonMusicClip();
+        if (gameWonMusicClip == null) return;
+
+        if (musicSource.clip == gameWonMusicClip && musicSource.isPlaying) return;
+
+        musicSource.Stop();
+        musicSource.ignoreListenerPause = true;
+        musicSource.clip = gameWonMusicClip;
+        musicSource.volume = gameWonMusicVolume;
+        musicSource.loop = false;
+        musicSource.Play();
+    }
+
+    private void StopBossMusicInternal(bool resumeDefaultMusic)
+    {
+        if (musicSource == null) return;
+
+        bool wasSpecialMusic = musicSource.clip == bossMusicClip || musicSource.clip == gameWonMusicClip;
+        if (musicSource.isPlaying && wasSpecialMusic)
+        {
+            musicSource.Stop();
+        }
+
+        musicSource.ignoreListenerPause = false;
+        if (!resumeDefaultMusic || !wasSpecialMusic) return;
+
+        musicClip ??= LoadExternalMusicClip();
+        musicClip ??= CreatePowerRockLoop();
+        musicSource.clip = musicClip;
+        musicSource.volume = musicVolume;
+        musicSource.loop = true;
+        musicSource.Play();
+    }
+
+    private void EnsureMusicSource()
+    {
+        if (musicSource != null) return;
+
+        musicSource = gameObject.AddComponent<AudioSource>();
+        musicSource.loop = true;
+        musicSource.playOnAwake = false;
+        musicSource.ignoreListenerPause = false;
+        musicSource.spatialBlend = 0f;
+        musicSource.volume = musicVolume;
     }
 
     private AudioClip LoadExternalMusicClip()
     {
         if (string.IsNullOrWhiteSpace(externalMusicResourcePath)) return null;
         return Resources.Load<AudioClip>(externalMusicResourcePath);
+    }
+
+    private AudioClip LoadGameWonMusicClip()
+    {
+        if (string.IsNullOrWhiteSpace(gameWonMusicResourcePath)) return null;
+
+        AudioClip clip = Resources.Load<AudioClip>(gameWonMusicResourcePath);
+        if (clip == null)
+        {
+            Debug.LogWarning($"Game won music not found at Resources/{gameWonMusicResourcePath}.", this);
+        }
+
+        return clip;
+    }
+
+    private AudioClip LoadBossMusicClip()
+    {
+        if (string.IsNullOrWhiteSpace(bossMusicResourcePath)) return null;
+
+        AudioClip clip = Resources.Load<AudioClip>(bossMusicResourcePath);
+        if (clip == null)
+        {
+            Debug.LogWarning($"Boss music not found at Resources/{bossMusicResourcePath}.", this);
+        }
+
+        return clip;
     }
 
     private void PlayAt(Vector3 position, AudioClip clip, float localVolume, float spatialBlend)

@@ -18,6 +18,7 @@ public class BossEnemy : MonoBehaviour
     [SerializeField] private float tornadoDescendSpeed = 0.9f;
     [SerializeField, Min(8)] private int tornadoHelperCount = DefaultTornadoHelperCount;
     [SerializeField] private float groundY = 0.05f;
+    [SerializeField, Range(-180f, 180f)] private float facePlayerYawOffsetDegrees = -67f;
 
     private BatEnemy batEnemy;
     private Damageable damageable;
@@ -65,16 +66,11 @@ public class BossEnemy : MonoBehaviour
     public void PrepareForEncounter(CavehuntDifficultySettings settings)
     {
         EnsureReferences();
+        ResetBatEnemyForBoss();
         ApplyDifficulty(settings);
         if (settings != null)
         {
             SetDescendSpeed(settings.BossDescendSpeed);
-        }
-
-        if (batEnemy != null)
-        {
-            batEnemy.SetDescendTowardGround(false);
-            batEnemy.SetRespawnOnDeath(false);
         }
 
         tornadoActive = false;
@@ -91,16 +87,11 @@ public class BossEnemy : MonoBehaviour
     public void BeginBossEncounter(Transform fallbackSpawnPoint, CavehuntDifficultySettings settings)
     {
         EnsureReferences();
+        ResetBatEnemyForBoss();
         ApplyDifficulty(settings);
         if (settings != null)
         {
             SetDescendSpeed(settings.BossDescendSpeed);
-        }
-
-        if (batEnemy != null)
-        {
-            batEnemy.SetDescendTowardGround(false);
-            batEnemy.SetRespawnOnDeath(false);
         }
 
         spawnPoint = ResolveSpawnPoint(fallbackSpawnPoint);
@@ -119,6 +110,15 @@ public class BossEnemy : MonoBehaviour
 
         transform.position = tornadoStart;
         tornadoActive = true;
+    }
+
+    private void ResetBatEnemyForBoss()
+    {
+        if (batEnemy == null) return;
+
+        batEnemy.ResetForBowPickup();
+        batEnemy.SetDescendTowardGround(false);
+        batEnemy.SetRespawnOnDeath(false);
     }
 
     private void OnEnable()
@@ -373,6 +373,7 @@ public class BossEnemy : MonoBehaviour
 
         Vector3 direction = target.position - transform.position;
         if (direction.sqrMagnitude <= 0.0001f) return;
-        transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up);
+        transform.rotation = Quaternion.LookRotation(direction.normalized, Vector3.up) *
+            Quaternion.Euler(0f, facePlayerYawOffsetDegrees, 0f);
     }
 }

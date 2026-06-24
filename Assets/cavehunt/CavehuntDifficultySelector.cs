@@ -11,6 +11,7 @@ public class CavehuntDifficultySelector : MonoBehaviour
     [SerializeField] private float targetScale = 0.85f;
     [SerializeField] private float targetBackgroundScaleMultiplier = 1.15f;
     [SerializeField] private float labelCharacterSize = 0.11f;
+    [SerializeField] private float labelAboveTargetOffset = 0.18f;
     [SerializeField] private Color labelColor = Color.white;
     [SerializeField] private bool useSceneAnchors = true;
 
@@ -103,6 +104,7 @@ public class CavehuntDifficultySelector : MonoBehaviour
             {
                 Transform anchor = anchors[i];
                 EnsureDamageable(anchor.gameObject);
+                EnsureTriggerColliders(anchor.gameObject);
                 CavehuntDifficultyTarget anchorTarget = EnsureDifficultyTarget(anchor.gameObject);
                 anchorTarget.Configure(this, i);
 
@@ -113,8 +115,9 @@ public class CavehuntDifficultySelector : MonoBehaviour
                 visualRoot.transform.localScale = Vector3.one;
                 sceneAnchorVisuals.Add(visualRoot);
 
-                CreateBackground(visualRoot.transform, profile.TargetColor, ResolveAnchorVisualScale(anchor, targetBackgroundScaleMultiplier));
-                CreateLabel(visualRoot.transform, displayLabel);
+                float anchorVisualScale = ResolveAnchorVisualScale(anchor, targetBackgroundScaleMultiplier);
+                CreateBackground(visualRoot.transform, profile.TargetColor, anchorVisualScale);
+                CreateLabel(visualRoot.transform, displayLabel, anchorVisualScale);
                 continue;
             }
 
@@ -129,19 +132,21 @@ public class CavehuntDifficultySelector : MonoBehaviour
             target.transform.localPosition = Vector3.zero;
             target.transform.localScale = Vector3.one * targetScale * Mathf.Max(0.1f, targetBackgroundScaleMultiplier);
 
-            Renderer renderer = target.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                renderer.sharedMaterial = CreateTargetMaterial(profile.TargetColor);
-            }
+                Renderer renderer = target.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.sharedMaterial = CreateTargetMaterial(profile.TargetColor);
+                }
 
-            Damageable damageable = target.AddComponent<Damageable>();
-            damageable.SetMaxHealth(1f);
+                EnsureTriggerColliders(target);
+
+                Damageable damageable = target.AddComponent<Damageable>();
+                damageable.SetMaxHealth(1f);
 
             CavehuntDifficultyTarget difficultyTarget = target.AddComponent<CavehuntDifficultyTarget>();
             difficultyTarget.Configure(this, i);
 
-            CreateLabel(choice.transform, displayLabel);
+            CreateLabel(choice.transform, displayLabel, targetScale * Mathf.Max(0.1f, targetBackgroundScaleMultiplier));
         }
 
         FaceTargetsToCamera();
@@ -169,11 +174,13 @@ public class CavehuntDifficultySelector : MonoBehaviour
         }
     }
 
-    private void CreateLabel(Transform target, string label)
+    private void CreateLabel(Transform target, string label, float backgroundScale)
     {
         GameObject labelObject = new GameObject("Difficulty Label");
         labelObject.transform.SetParent(target, false);
-        labelObject.transform.localPosition = Vector3.back * 0.045f;
+        labelObject.transform.localPosition =
+            Vector3.up * (Mathf.Max(0.1f, backgroundScale) * 0.63f + Mathf.Max(0f, labelAboveTargetOffset)) +
+            Vector3.back * 0.045f;
         labelObject.transform.localScale = Vector3.one;
 
         TextMesh text = labelObject.AddComponent<TextMesh>();
@@ -346,6 +353,20 @@ public class CavehuntDifficultySelector : MonoBehaviour
         damageable.DeactivateOnDeath = false;
         damageable.SetMaxHealth(1f);
         return damageable;
+    }
+
+    private static void EnsureTriggerColliders(GameObject target)
+    {
+        if (target == null) return;
+
+        Collider[] colliders = target.GetComponents<Collider>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+            {
+                colliders[i].isTrigger = true;
+            }
+        }
     }
 
     private static CavehuntDifficultyTarget EnsureDifficultyTarget(GameObject target)

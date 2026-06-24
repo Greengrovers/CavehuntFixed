@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Events;
 
 public class CavehuntEncounterDirector : MonoBehaviour
@@ -45,6 +45,11 @@ public class CavehuntEncounterDirector : MonoBehaviour
     private int outerRingKills;
     private int innerRingKills;
 
+    public int OuterRingKills => outerRingKills;
+    public int InnerRingKills => innerRingKills;
+    public int OuterRingKillsToBoss => outerRingKillsToBoss;
+    public int InnerRingKillsToBoss => innerRingKillsToBoss;
+
     public static CavehuntEncounterDirector Resolve(bool createIfMissing = true)
     {
         CavehuntEncounterDirector director = FindAnyObjectByType<CavehuntEncounterDirector>(FindObjectsInactive.Include);
@@ -65,6 +70,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
 
         StopRingSpawners();
         PrepareBoss();
+        ProceduralGameAudio.StopBossMusic();
 
         if (difficultySelector != null)
         {
@@ -104,10 +110,10 @@ public class CavehuntEncounterDirector : MonoBehaviour
         tutorialKills = 0;
         outerRingKills = 0;
         innerRingKills = 0;
-
         ResetEnemiesByRole(CavehuntEnemyRole.Tutorial);
         StopRingSpawners();
         PrepareBoss();
+        ProceduralGameAudio.StopBossMusic();
         if (difficultySelector != null)
         {
             difficultySelector.HideSelection();
@@ -120,6 +126,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
 
         if (role == CavehuntEnemyRole.Boss)
         {
+            AwardScoreForDefeat(role, tracker);
             CompleteVictory();
             return;
         }
@@ -139,10 +146,12 @@ public class CavehuntEncounterDirector : MonoBehaviour
 
         if (role == CavehuntEnemyRole.OuterRing)
         {
+            AwardScoreForDefeat(role, tracker);
             outerRingKills++;
         }
         else if (role == CavehuntEnemyRole.InnerRing)
         {
+            AwardScoreForDefeat(role, tracker);
             innerRingKills++;
         }
 
@@ -152,6 +161,14 @@ public class CavehuntEncounterDirector : MonoBehaviour
         }
     }
 
+
+    private void AwardScoreForDefeat(CavehuntEnemyRole role, CavehuntEnemyKillTracker tracker)
+    {
+        if (role == CavehuntEnemyRole.Tutorial) return;
+
+        Vector3 scorePosition = tracker != null ? tracker.transform.position : Vector3.zero;
+        CavehuntScoreSystem.AddEnemyScore(role, scorePosition);
+    }
     private void Awake()
     {
         ResolveReferences();
@@ -239,6 +256,9 @@ public class CavehuntEncounterDirector : MonoBehaviour
         if (bossEnemy != null) return;
 
         bossEnemy = FindAnyObjectByType<BossEnemy>(FindObjectsInactive.Include);
+        if (bossEnemy != null) return;
+
+        bossEnemy = BatEncounterBootstrap.EnsureBossEnemyExists(this);
     }
 
     private void ResolveBossSpawnPoint()
@@ -265,6 +285,10 @@ public class CavehuntEncounterDirector : MonoBehaviour
             if (tracker == null || tracker.Role != CavehuntEnemyRole.Tutorial) continue;
 
             enemy.gameObject.SetActive(true);
+            if (difficultySettings != null)
+            {
+                enemy.SetDescendSpeed(difficultySettings.TutorialBatDescendSpeed);
+            }
             enemy.BeginEncounter();
         }
     }
@@ -318,13 +342,18 @@ public class CavehuntEncounterDirector : MonoBehaviour
 
     private void StartBossFight()
     {
+        ResolveReferences();
+
+        if (bossEnemy == null)
+        {
+            Debug.LogWarning("Cavehunt encounter could not start boss phase because no BossEnemy exists.");
+            return;
+        }
+
         phase = EncounterPhase.Boss;
         StopRingSpawners();
-
-        if (bossEnemy != null)
-        {
-            bossEnemy.BeginBossEncounter(bossSpawnPoint, difficultySettings);
-        }
+        bossEnemy.BeginBossEncounter(bossSpawnPoint, difficultySettings);
+        ProceduralGameAudio.StartBossMusic();
 
         Debug.Log("Cavehunt encounter advanced: Boss phase.");
     }
@@ -344,6 +373,8 @@ public class CavehuntEncounterDirector : MonoBehaviour
 
     private void PrepareBoss()
     {
+        ResolveBossEnemy();
+
         if (bossEnemy != null)
         {
             bossEnemy.PrepareForEncounter(difficultySettings);
@@ -376,6 +407,21 @@ public class CavehuntEncounterDirector : MonoBehaviour
         ResolveInnerRingSpawner();
     }
 
+    private float GetDescendSpeedForRole(CavehuntEnemyRole role)
+    {
+        if (difficultySettings == null) return 1.5f;
+
+        switch (role)
+        {
+            case CavehuntEnemyRole.Tutorial:
+                return difficultySettings.TutorialBatDescendSpeed;
+            case CavehuntEnemyRole.Boss:
+                return difficultySettings.BossDescendSpeed;
+            default:
+                return difficultySettings.BatDescendSpeed;
+        }
+    }
+
     private void ApplyDifficultyToExistingEnemies()
     {
         CavehuntEnemyKillTracker[] trackers = FindObjectsByType<CavehuntEnemyKillTracker>(FindObjectsInactive.Include);
@@ -390,7 +436,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
             BatEnemy enemy = tracker.GetComponent<BatEnemy>();
             if (enemy != null)
             {
-                enemy.SetDescendSpeed(difficultySettings.BatDescendSpeed);
+                enemy.SetDescendSpeed(GetDescendSpeedForRole(tracker.Role));
             }
         }
     }
@@ -401,6 +447,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
 
         phase = EncounterPhase.Victory;
         StopRingSpawners();
+        ProceduralGameAudio.StopBossMusic(false);
         CavehuntRuntimeCleanup.DestroyGameplayLeftovers();
         PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>(FindObjectsInactive.Include);
         if (playerHealth != null)

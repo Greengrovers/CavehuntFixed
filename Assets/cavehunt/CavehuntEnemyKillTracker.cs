@@ -50,6 +50,7 @@ public class CavehuntEnemyKillTracker : MonoBehaviour
 
     private void HandleDied()
     {
+
         if (director == null)
         {
             director = CavehuntEncounterDirector.Resolve(false);

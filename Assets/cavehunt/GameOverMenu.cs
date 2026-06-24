@@ -43,8 +43,10 @@ public class GameOverMenu : MonoBehaviour
     private GameObject worldTextRoot;
     private Text titleLabel;
     private Text hintLabel;
+    private Text scoreLabel;
     private TextMesh titleWorldLabel;
     private TextMesh hintWorldLabel;
+    private TextMesh scoreWorldLabel;
     private CurvedRawImage backgroundImage;
 
     private Canvas canvas;
@@ -62,12 +64,16 @@ public class GameOverMenu : MonoBehaviour
     public void ShowGameOver()
     {
         ApplyContent(gameOverTitleText, gameOverHintText, backgroundResourcePath);
+        ApplyScoreText(string.Empty, false);
         Show();
     }
 
     public void ShowGameWon()
     {
+        string scoreText = $"Score: {CavehuntScoreSystem.Score}";
+        ProceduralGameAudio.StartGameWonMusic();
         ApplyContent(gameWonTitleText, gameWonHintText, gameWonBackgroundResourcePath);
+        ApplyScoreText(scoreText, true);
         Show();
     }
 
@@ -126,8 +132,13 @@ public class GameOverMenu : MonoBehaviour
         selectedIndex = 0;
         ApplyButtonColorDefaults();
 
+        if (!HasScoreText())
+        {
+            ProceduralGameAudio.StopBossMusic(false);
+        }
         Time.timeScale = 0f;
         AudioListener.pause = true;
+        GameEndGroundVisibility.HideGround();
 
         canvas.gameObject.SetActive(true);
         SetMenuTextVisible(true);
@@ -142,6 +153,7 @@ public class GameOverMenu : MonoBehaviour
         {
             Time.timeScale = previousTimeScale <= 0f ? 1f : previousTimeScale;
             AudioListener.pause = previousAudioPause;
+            GameEndGroundVisibility.RestoreGround();
         }
 
         visible = false;
@@ -197,6 +209,8 @@ public class GameOverMenu : MonoBehaviour
         yield return new WaitForSecondsRealtime(Mathf.Max(0f, actionRevealDelay));
 
         Hide();
+        ProceduralGameAudio.StopBossMusic(true);
+        CavehuntScoreSystem.ResetScore();
 
         if (playerHealth != null)
         {
@@ -212,6 +226,8 @@ public class GameOverMenu : MonoBehaviour
         yield return new WaitForSecondsRealtime(Mathf.Max(0f, actionRevealDelay));
 
         Hide();
+        ProceduralGameAudio.StopBossMusic(true);
+        CavehuntScoreSystem.ResetScore();
 
 #if UNITY_EDITOR
         EditorApplication.isPlaying = false;
@@ -268,6 +284,18 @@ public class GameOverMenu : MonoBehaviour
             FontStyle.Bold
         );
 
+        scoreLabel = CreateText(
+            "Game Score",
+            canvasRect,
+            string.Empty,
+            72,
+            hintColor,
+            new Vector2(0.04f, 0.41f),
+            new Vector2(0.96f, 0.48f),
+            FontStyle.Bold
+        );
+        scoreLabel.enabled = false;
+
         CreateButton(
             canvasRect,
             0,
@@ -321,6 +349,28 @@ public class GameOverMenu : MonoBehaviour
         if (hintWorldLabel != null) hintWorldLabel.text = hint;
 
         ApplyBackground(backgroundPath);
+    }
+
+    private void ApplyScoreText(string text, bool visibleScore)
+    {
+        bool active = visibleScore && !string.IsNullOrWhiteSpace(text);
+
+        if (scoreLabel != null)
+        {
+            scoreLabel.text = active ? text : string.Empty;
+            scoreLabel.enabled = active && visible;
+        }
+
+        if (scoreWorldLabel != null)
+        {
+            scoreWorldLabel.text = active ? text : string.Empty;
+            scoreWorldLabel.gameObject.SetActive(active && visible);
+        }
+    }
+
+    private bool HasScoreText()
+    {
+        return scoreLabel != null && !string.IsNullOrWhiteSpace(scoreLabel.text);
     }
 
     private void ApplyBackground(string resourcePath)
@@ -614,6 +664,8 @@ public class GameOverMenu : MonoBehaviour
 
         titleWorldLabel = CreateWorldTextLabel("Game Over 3D Title", gameOverTitleText, 77, 0.0208f, titleColor, FontStyle.Bold);
         hintWorldLabel = CreateWorldTextLabel("Game Over 3D Hint", gameOverHintText, 58, 0.012f, hintColor, FontStyle.Bold);
+        scoreWorldLabel = CreateWorldTextLabel("Game Won 3D Score", string.Empty, 58, 0.012f, hintColor, FontStyle.Bold);
+        scoreWorldLabel.gameObject.SetActive(false);
         buttonWorldLabels[0] = CreateWorldTextLabel("Retry 3D Label", "Retry", 70, 0.0176f, normalTextColor, FontStyle.Bold);
         buttonWorldLabels[1] = CreateWorldTextLabel("Quit 3D Label", "Quit", 70, 0.0176f, normalTextColor, FontStyle.Bold);
         buttonWorldBackgrounds[0] = CreateWorldButtonBackground("Retry 3D Background");
@@ -722,6 +774,8 @@ public class GameOverMenu : MonoBehaviour
     {
         if (titleLabel != null) titleLabel.enabled = active;
         if (hintLabel != null) hintLabel.enabled = active;
+        if (scoreLabel != null) scoreLabel.enabled = active && HasScoreText();
+        if (scoreWorldLabel != null) scoreWorldLabel.gameObject.SetActive(active && visible && HasScoreText());
 
         for (int i = 0; i < buttonLabels.Length; i++)
         {
@@ -746,6 +800,7 @@ public class GameOverMenu : MonoBehaviour
         Vector3 forward = rotation * Vector3.forward;
         Vector3 textPlane = center - forward * 0.09f;
 
+        Vector3 scorePosition = textPlane + up * 0.12f;
         Vector3 retryPosition = textPlane - up * 0.04f;
         Vector3 quitPosition = textPlane - up * 0.30f;
 
@@ -753,6 +808,7 @@ public class GameOverMenu : MonoBehaviour
         PositionWorldBackground(buttonWorldBackgrounds[1], quitPosition + forward * 0.018f, rotation, new Vector2(0.78f, 0.20f));
         PositionWorldLabel(titleWorldLabel, textPlane + up * 0.43f, rotation);
         PositionWorldLabel(hintWorldLabel, textPlane + up * 0.25f, rotation);
+        PositionWorldLabel(scoreWorldLabel, scorePosition, rotation);
         PositionWorldLabel(buttonWorldLabels[0], retryPosition, rotation);
         PositionWorldLabel(buttonWorldLabels[1], quitPosition, rotation);
     }

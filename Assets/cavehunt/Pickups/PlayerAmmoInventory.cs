@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 using UnityEngine.UI;
@@ -223,6 +223,14 @@ public class AmmoHud : MonoBehaviour
     [SerializeField] private Vector2 canvasSize = new Vector2(480f, 92f);
     [SerializeField] private Vector2 slotSize = new Vector2(92f, 78f);
     [SerializeField] private float slotGap = 16f;
+    [SerializeField] private Vector2 topHudLocalOffset = new Vector2(0f, 0.55f);
+    [SerializeField] private Vector2 topHudCanvasSize = new Vector2(900f, 130f);
+    [SerializeField] private Vector2 scoreSize = new Vector2(360f, 78f);
+    [SerializeField] private Vector2 scoreOffset = new Vector2(255f, 0f);
+    [SerializeField] private Vector2 progressSize = new Vector2(360f, 96f);
+    [SerializeField] private Vector2 progressOffset = new Vector2(-255f, 0f);
+    [SerializeField] private int scoreFontSize = 44;
+    [SerializeField] private int progressFontSize = 38;
 
     private static readonly AmmoType[] DisplayOrder =
     {
@@ -235,7 +243,19 @@ public class AmmoHud : MonoBehaviour
     private PlayerAmmoInventory inventory;
     private Canvas canvas;
     private RectTransform canvasRect;
+    private Canvas topHudCanvas;
+    private RectTransform topHudCanvasRect;
     private AmmoSlot[] slots;
+    private Text scoreLabel;
+    private Text scoreShadow;
+    private Text progressLabel;
+    private Text progressShadow;
+    private CavehuntEncounterDirector encounterDirector;
+    private int lastScore = int.MinValue;
+    private int lastOuterKills = int.MinValue;
+    private int lastInnerKills = int.MinValue;
+    private int lastOuterTarget = int.MinValue;
+    private int lastInnerTarget = int.MinValue;
     private Font hudFont;
 
     private struct AmmoSlot
@@ -261,12 +281,15 @@ public class AmmoHud : MonoBehaviour
     private void Start()
     {
         BuildHud();
+        BuildTopHud();
     }
 
     private void LateUpdate()
     {
         EnsureCameraParent();
+        EnsureTopHudCameraParent();
         UpdateHud();
+        UpdateTopHud();
     }
 
     private void BuildHud()
@@ -300,6 +323,48 @@ public class AmmoHud : MonoBehaviour
 
         EnsureCameraParent();
         UpdateHud();
+    }
+
+    private void BuildTopHud()
+    {
+        if (topHudCanvas != null) return;
+
+        GameObject root = new GameObject("Combat HUD");
+        root.transform.SetParent(transform, false);
+
+        topHudCanvas = root.AddComponent<Canvas>();
+        topHudCanvas.renderMode = RenderMode.WorldSpace;
+        topHudCanvas.sortingOrder = 31;
+
+        topHudCanvasRect = root.GetComponent<RectTransform>();
+        topHudCanvasRect.sizeDelta = topHudCanvasSize;
+        topHudCanvasRect.localScale = Vector3.one * 0.00145f;
+
+        CanvasScaler scaler = root.AddComponent<CanvasScaler>();
+        scaler.dynamicPixelsPerUnit = 10f;
+
+        progressShadow = CreateText("Progress Shadow", topHudCanvasRect, "Outer: 0/0\nInner: 0/0", progressFontSize, progressSize, progressOffset + new Vector2(3f, -3f));
+        progressShadow.color = new Color(0f, 0f, 0f, 0.9f);
+        progressShadow.fontStyle = FontStyle.Bold;
+        progressShadow.alignment = TextAnchor.MiddleLeft;
+
+        progressLabel = CreateText("Progress", topHudCanvasRect, "Outer: 0/0\nInner: 0/0", progressFontSize, progressSize, progressOffset);
+        progressLabel.color = Color.white;
+        progressLabel.fontStyle = FontStyle.Bold;
+        progressLabel.alignment = TextAnchor.MiddleLeft;
+
+        scoreShadow = CreateText("Score Shadow", topHudCanvasRect, "Score: 0", scoreFontSize, scoreSize, scoreOffset + new Vector2(3f, -3f));
+        scoreShadow.color = new Color(0f, 0f, 0f, 0.9f);
+        scoreShadow.fontStyle = FontStyle.Bold;
+        scoreShadow.alignment = TextAnchor.MiddleRight;
+
+        scoreLabel = CreateText("Score", topHudCanvasRect, "Score: 0", scoreFontSize, scoreSize, scoreOffset);
+        scoreLabel.color = Color.white;
+        scoreLabel.fontStyle = FontStyle.Bold;
+        scoreLabel.alignment = TextAnchor.MiddleRight;
+
+        EnsureTopHudCameraParent();
+        UpdateTopHud();
     }
 
     private AmmoSlot CreateSlot(AmmoType ammoType, float x)
@@ -375,7 +440,7 @@ public class AmmoHud : MonoBehaviour
     {
         if (canvasRect == null) return;
 
-        Camera camera = Camera.main;
+        Camera camera = ResolveHudCamera();
         if (camera == null) return;
 
         if (canvasRect.parent != camera.transform)
@@ -386,6 +451,31 @@ public class AmmoHud : MonoBehaviour
         canvasRect.localPosition = new Vector3(localOffset.x, localOffset.y, hudDistance);
         canvasRect.localRotation = Quaternion.identity;
         canvasRect.localScale = Vector3.one * 0.00145f;
+    }
+
+    private void EnsureTopHudCameraParent()
+    {
+        if (topHudCanvasRect == null) return;
+
+        Camera camera = ResolveHudCamera();
+        if (camera == null) return;
+
+        if (topHudCanvasRect.parent != camera.transform)
+        {
+            topHudCanvasRect.SetParent(camera.transform, false);
+        }
+
+        topHudCanvasRect.localPosition = new Vector3(topHudLocalOffset.x, topHudLocalOffset.y, hudDistance);
+        topHudCanvasRect.localRotation = Quaternion.identity;
+        topHudCanvasRect.localScale = Vector3.one * 0.00145f;
+    }
+
+    private static Camera ResolveHudCamera()
+    {
+        Camera camera = Camera.main;
+        if (camera != null) return camera;
+
+        return VrCameraResolver.GetCamera();
     }
 
     private void UpdateHud()
@@ -431,6 +521,48 @@ public class AmmoHud : MonoBehaviour
                 slot.Icon.color = iconColor;
                 slot.Icon.fontSize = isActive ? 32 : 28;
             }
+        }    }
+
+    private void UpdateTopHud()
+    {
+        if (scoreLabel == null || progressLabel == null) return;
+
+        if (encounterDirector == null)
+        {
+            encounterDirector = CavehuntEncounterDirector.Resolve(false);
+        }
+
+        int currentScore = CavehuntScoreSystem.Score;
+        int outerKills = encounterDirector != null ? encounterDirector.OuterRingKills : 0;
+        int innerKills = encounterDirector != null ? encounterDirector.InnerRingKills : 0;
+        int outerTarget = encounterDirector != null ? encounterDirector.OuterRingKillsToBoss : 0;
+        int innerTarget = encounterDirector != null ? encounterDirector.InnerRingKillsToBoss : 0;
+
+        if (currentScore != lastScore)
+        {
+            string scoreText = $"Score: {currentScore}";
+            scoreLabel.text = scoreText;
+            if (scoreShadow != null)
+            {
+                scoreShadow.text = scoreText;
+            }
+
+            lastScore = currentScore;
+        }
+
+        if (outerKills != lastOuterKills || innerKills != lastInnerKills || outerTarget != lastOuterTarget || innerTarget != lastInnerTarget)
+        {
+            string progressText = $"Outer: {outerKills}/{outerTarget}\nInner: {innerKills}/{innerTarget}";
+            progressLabel.text = progressText;
+            if (progressShadow != null)
+            {
+                progressShadow.text = progressText;
+            }
+
+            lastOuterKills = outerKills;
+            lastInnerKills = innerKills;
+            lastOuterTarget = outerTarget;
+            lastInnerTarget = innerTarget;
         }
     }
 
