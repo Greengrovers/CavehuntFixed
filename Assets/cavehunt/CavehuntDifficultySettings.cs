@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class CavehuntDifficultySettings : MonoBehaviour
 {
@@ -18,6 +18,9 @@ public class CavehuntDifficultySettings : MonoBehaviour
         [SerializeField] private float batDescendSpeed = 1.5f;
         [SerializeField] private float tutorialBatDescendSpeed = 0.8f;
         [SerializeField] private float bossDescendSpeed = 0.9f;
+
+        [Header("Shooting")]
+        [SerializeField] private float tutorialBatBulletSpeed = 8f;
 
         [Header("Enemy Size")]
         [SerializeField] private float batScaleMultiplier = 1.1f;
@@ -41,6 +44,7 @@ public class CavehuntDifficultySettings : MonoBehaviour
         public float BatDescendSpeed => Mathf.Max(0.05f, batDescendSpeed);
         public float TutorialBatDescendSpeed => Mathf.Max(0.05f, tutorialBatDescendSpeed);
         public float BossDescendSpeed => Mathf.Max(0.05f, bossDescendSpeed);
+        public float TutorialBatBulletSpeed => Mathf.Max(0.1f, tutorialBatBulletSpeed);
         public float BatScaleMultiplier => Mathf.Max(0.1f, batScaleMultiplier);
         public float InnerRingBatScaleMultiplier => Mathf.Max(0.1f, innerRingBatScaleMultiplier);
         public float BossScaleMultiplier => Mathf.Max(0.1f, bossScaleMultiplier);
@@ -61,6 +65,7 @@ public class CavehuntDifficultySettings : MonoBehaviour
             float batDescendSpeed,
             float tutorialBatDescendSpeed,
             float bossDescendSpeed,
+            float tutorialBatBulletSpeed,
             float batScaleMultiplier,
             float innerRingBatScaleMultiplier,
             float bossScaleMultiplier,
@@ -80,6 +85,7 @@ public class CavehuntDifficultySettings : MonoBehaviour
             this.batDescendSpeed = batDescendSpeed;
             this.tutorialBatDescendSpeed = tutorialBatDescendSpeed;
             this.bossDescendSpeed = bossDescendSpeed;
+            this.tutorialBatBulletSpeed = tutorialBatBulletSpeed;
             this.batScaleMultiplier = batScaleMultiplier;
             this.innerRingBatScaleMultiplier = innerRingBatScaleMultiplier;
             this.bossScaleMultiplier = bossScaleMultiplier;
@@ -95,9 +101,9 @@ public class CavehuntDifficultySettings : MonoBehaviour
     [SerializeField] private int selectedProfileIndex = 1;
     [SerializeField] private DifficultyProfile[] profiles =
     {
-        new DifficultyProfile("Easy", new Color(0.25f, 0.9f, 0.35f, 1f), 7f, 2f, 4f, 18f, 1.0f, 0.65f, 0.65f, 1.0f, 1.2f, 5f, 1, 3, 1, 2, 10, 5),
-        new DifficultyProfile("Normal", new Color(1f, 0.86f, 0.2f, 1f), 5f, 3f, 6f, 25f, 1.5f, 0.8f, 0.9f, 1.1f, 1.35f, 5f, 1, 3, 1, 2, 14, 7),
-        new DifficultyProfile("Hard", new Color(1f, 0.25f, 0.18f, 1f), 4f, 5f, 9f, 40f, 2.1f, 0.9f, 1.2f, 1.15f, 1.45f, 5f, 2, 5, 1, 3, 18, 9)
+        new DifficultyProfile("Easy", new Color(0.25f, 0.9f, 0.35f, 1f), 7f, 2f, 4f, 18f, 1.0f, 0.65f, 0.65f, 8f, 1.0f, 1.2f, 5f, 1, 3, 1, 2, 10, 5),
+        new DifficultyProfile("Normal", new Color(1f, 0.86f, 0.2f, 1f), 5f, 3f, 6f, 25f, 1.5f, 0.8f, 0.9f, 12f, 1.1f, 1.35f, 5f, 1, 3, 1, 2, 14, 7),
+        new DifficultyProfile("Hard", new Color(1f, 0.25f, 0.18f, 1f), 4f, 5f, 9f, 40f, 2.1f, 0.9f, 1.2f, 12f, 1.15f, 1.45f, 5f, 2, 5, 1, 3, 18, 9)
     };
 
     public int ProfileCount => Profiles.Length;
@@ -110,6 +116,7 @@ public class CavehuntDifficultySettings : MonoBehaviour
     public float BatDescendSpeed => ActiveProfile.BatDescendSpeed;
     public float TutorialBatDescendSpeed => ActiveProfile.TutorialBatDescendSpeed;
     public float BossDescendSpeed => ActiveProfile.BossDescendSpeed;
+    public float TutorialBatBulletSpeed => ActiveProfile.TutorialBatBulletSpeed;
     public float BatScaleMultiplier => ActiveProfile.BatScaleMultiplier;
     public float InnerRingBatScaleMultiplier => ActiveProfile.InnerRingBatScaleMultiplier;
     public float BossScaleMultiplier => ActiveProfile.BossScaleMultiplier;
@@ -204,9 +211,9 @@ public class CavehuntDifficultySettings : MonoBehaviour
     {
         return new[]
         {
-            new DifficultyProfile("Easy", new Color(0.25f, 0.9f, 0.35f, 1f), 7f, 2f, 4f, 18f, 1.0f, 0.65f, 0.65f, 1.0f, 1.2f, 5f, 1, 3, 1, 2, 10, 5),
-            new DifficultyProfile("Normal", new Color(1f, 0.86f, 0.2f, 1f), 5f, 3f, 6f, 25f, 1.5f, 0.8f, 0.9f, 1.1f, 1.35f, 5f, 1, 3, 1, 2, 14, 7),
-            new DifficultyProfile("Hard", new Color(1f, 0.25f, 0.18f, 1f), 4f, 5f, 9f, 40f, 2.1f, 0.9f, 1.2f, 1.15f, 1.45f, 5f, 2, 5, 1, 3, 18, 9)
+            new DifficultyProfile("Easy", new Color(0.25f, 0.9f, 0.35f, 1f), 7f, 2f, 4f, 18f, 1.0f, 0.65f, 0.65f, 8f, 1.0f, 1.2f, 5f, 1, 3, 1, 2, 10, 5),
+            new DifficultyProfile("Normal", new Color(1f, 0.86f, 0.2f, 1f), 5f, 3f, 6f, 25f, 1.5f, 0.8f, 0.9f, 12f, 1.1f, 1.35f, 5f, 1, 3, 1, 2, 14, 7),
+            new DifficultyProfile("Hard", new Color(1f, 0.25f, 0.18f, 1f), 4f, 5f, 9f, 40f, 2.1f, 0.9f, 1.2f, 12f, 1.15f, 1.45f, 5f, 2, 5, 1, 3, 18, 9)
         };
     }
 }

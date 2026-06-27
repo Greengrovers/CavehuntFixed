@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 
 public static class BatEncounterBootstrap
@@ -141,7 +141,7 @@ public static class BatEncounterBootstrap
         batEnemy.SetPreferredSpawnIndex(spawnOffset);
         batEnemy.SetRespawnOnDeath(false);
         batEnemy.SetDescendSpeed(difficultySettings.TutorialBatDescendSpeed);
-        batEnemy.ApplyEncounterTuning(BatShootInterval, BatBulletSpeed, BatBulletDamage);
+        batEnemy.ApplyEncounterTuning(BatShootInterval, difficultySettings.TutorialBatBulletSpeed, BatBulletDamage);
         batEnemy.Configure(playerTarget, bulletSpawn, spawnPoints, bulletMaterial, playerHealth);
 
         EnemyPickupDropper pickupDropper = bat.GetComponent<EnemyPickupDropper>();

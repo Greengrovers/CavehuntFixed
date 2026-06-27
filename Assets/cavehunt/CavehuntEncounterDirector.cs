@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 using UnityEngine.Events;
 
 public class CavehuntEncounterDirector : MonoBehaviour
@@ -34,6 +35,9 @@ public class CavehuntEncounterDirector : MonoBehaviour
     [SerializeField] private BossEnemy bossEnemy;
     [SerializeField] private Transform bossSpawnPoint;
     [SerializeField] private string bossSpawnPointName = "BossbatSpawn";
+    [Header("Tutorial Prompt")]
+    [SerializeField] private string easyTutorialPromptTitle = "Bats will shoot you";
+    [SerializeField] private string easyTutorialPromptText = "Shoot the bats before they reach the ground. Press A to continue.";
 
     [Header("Events")]
     [SerializeField] private UnityEvent onVictory;
@@ -96,7 +100,15 @@ public class CavehuntEncounterDirector : MonoBehaviour
 
         StopRingSpawners();
         PrepareBoss();
-        BeginTutorialEnemies();
+        
+        if (IsEasyDifficulty(selectedIndex))
+        {
+            CavehuntInfoPrompt.ShowTextOnly(easyTutorialPromptTitle, easyTutorialPromptText, BeginTutorialEnemies, true);
+        }
+        else
+        {
+            BeginTutorialEnemies();
+        }
 
         string difficultyName = difficultySettings != null ? difficultySettings.GetProfile(selectedIndex).DisplayName : "Default";
         Debug.Log($"Cavehunt encounter started: {difficultyName} difficulty.");
@@ -288,6 +300,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
             if (difficultySettings != null)
             {
                 enemy.SetDescendSpeed(difficultySettings.TutorialBatDescendSpeed);
+                            enemy.SetBulletSpeed(difficultySettings.TutorialBatBulletSpeed);
             }
             enemy.BeginEncounter();
         }
@@ -437,8 +450,19 @@ public class CavehuntEncounterDirector : MonoBehaviour
             if (enemy != null)
             {
                 enemy.SetDescendSpeed(GetDescendSpeedForRole(tracker.Role));
+                            if (tracker.Role == CavehuntEnemyRole.Tutorial)
+                {
+                    enemy.SetBulletSpeed(difficultySettings.TutorialBatBulletSpeed);
+                }
             }
         }
+    }
+    private bool IsEasyDifficulty(int selectedIndex)
+    {
+        if (difficultySettings == null) return selectedIndex == 0;
+
+        CavehuntDifficultySettings.DifficultyProfile profile = difficultySettings.GetProfile(selectedIndex);
+        return profile != null && profile.DisplayName.ToLowerInvariant().Contains("easy");
     }
 
     private void CompleteVictory()

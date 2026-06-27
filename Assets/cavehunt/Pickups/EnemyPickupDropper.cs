@@ -12,6 +12,7 @@ public class EnemyPickupDropper : MonoBehaviour
 
     [Header("Boundary Drop")]
     [SerializeField] private bool dropInsidePlayerBoundary = true;
+    [SerializeField] private string geodeBoundaryPrefix = "Geode Boundary";
     [SerializeField] private float boundaryRadius = 100f;
     [SerializeField] private float boundaryPadding = 8f;
     [SerializeField] private float minimumPlayerDropDistance = 10f;
@@ -43,6 +44,9 @@ public class EnemyPickupDropper : MonoBehaviour
     private Transform cachedPlayerTarget;
     private GameObject cachedSpikeTrapTemplate;
     private GameObject cachedHealingGeodeTemplate;
+    private bool hasCachedArenaBoundary;
+    private Vector3 cachedArenaCenter;
+    private float cachedArenaRadius;
 
     private void Awake()
     {
@@ -128,14 +132,12 @@ public class EnemyPickupDropper : MonoBehaviour
         }
 
         Transform playerTarget = ResolvePlayerTarget();
-        if (playerTarget == null)
+        if (!TryResolveDropBoundary(playerTarget, out Vector3 center, out float maxRadius))
         {
             Vector2 jitter = Random.insideUnitCircle * horizontalJitter;
             return ResolveGroundDropPosition(enemyPosition, jitter);
         }
 
-        Vector3 center = playerTarget.position;
-        float maxRadius = Mathf.Max(1f, boundaryRadius - Mathf.Max(0f, boundaryPadding));
         float minRadius = Mathf.Clamp(minimumPlayerDropDistance, 0f, maxRadius - 0.5f);
         int attempts = Mathf.Max(1, dropPositionAttempts);
 
@@ -151,7 +153,7 @@ public class EnemyPickupDropper : MonoBehaviour
             float distance = Mathf.Lerp(minRadius, maxRadius, Mathf.Sqrt(Random.value));
             offset = offset.normalized * distance;
             Vector3 horizontalPosition = new Vector3(center.x + offset.x, enemyPosition.y, center.z + offset.y);
-            Vector3 resolvedPosition = ResolveGroundDropPosition(horizontalPosition, Vector2.zero);
+            Vector3 resolvedPosition = ResolveGroundDropPositionInsideBoundary(horizontalPosition, Vector2.zero, spawnLift, center, maxRadius);
 
             if (IsInsideBoundary(resolvedPosition, center, maxRadius))
             {
@@ -174,7 +176,118 @@ public class EnemyPickupDropper : MonoBehaviour
         }
 
         Vector3 fallbackPosition = new Vector3(center.x + fallbackOffset.x, enemyPosition.y, center.z + fallbackOffset.z);
-        return ResolveGroundDropPosition(fallbackPosition, Vector2.zero);
+        return ResolveGroundDropPositionInsideBoundary(fallbackPosition, Vector2.zero, spawnLift, center, maxRadius);
+    }
+
+
+    private Vector3 ResolveGroundDropPositionInsideBoundary(Vector3 horizontalPosition, Vector2 jitter, float lift, Vector3 center, float maxRadius)
+    {
+        Vector3 resolvedPosition = ResolveGroundDropPosition(horizontalPosition, jitter, lift);
+        if (IsInsideBoundary(resolvedPosition, center, maxRadius))
+        {
+            return resolvedPosition;
+        }
+
+        Vector3 clampedHorizontalPosition = ClampHorizontalToBoundary(resolvedPosition, center, maxRadius);
+        Vector3 clampedResolvedPosition = ResolveGroundDropPosition(clampedHorizontalPosition, Vector2.zero, lift);
+        if (IsInsideBoundary(clampedResolvedPosition, center, maxRadius))
+        {
+            return clampedResolvedPosition;
+        }
+
+        return ClampHorizontalToBoundary(clampedResolvedPosition, center, maxRadius);
+    }
+
+    private static Vector3 ClampHorizontalToBoundary(Vector3 position, Vector3 center, float maxRadius)
+    {
+        Vector3 offset = position - center;
+        offset.y = 0f;
+
+        float safeRadius = Mathf.Max(0.01f, maxRadius);
+        if (offset.sqrMagnitude <= safeRadius * safeRadius)
+        {
+            return position;
+        }
+
+        Vector3 clampedOffset = offset.normalized * safeRadius;
+        return new Vector3(center.x + clampedOffset.x, position.y, center.z + clampedOffset.z);
+    }
+    private bool TryResolveDropBoundary(Transform playerTarget, out Vector3 center, out float maxRadius)
+    {
+        if (TryResolveGeodeArenaBoundary(out center, out maxRadius))
+        {
+            return true;
+        }
+
+        if (playerTarget != null)
+        {
+            center = playerTarget.position;
+            maxRadius = Mathf.Max(1f, boundaryRadius - Mathf.Max(0f, boundaryPadding));
+            return true;
+        }
+
+        center = Vector3.zero;
+        maxRadius = 0f;
+        return false;
+    }
+
+    private bool TryResolveGeodeArenaBoundary(out Vector3 center, out float maxRadius)
+    {
+        if (!hasCachedArenaBoundary)
+        {
+            RecalculateGeodeArenaBoundary();
+        }
+
+        center = cachedArenaCenter;
+        maxRadius = cachedArenaRadius;
+        return cachedArenaRadius > 1f;
+    }
+
+    private void RecalculateGeodeArenaBoundary()
+    {
+        hasCachedArenaBoundary = true;
+        cachedArenaCenter = Vector3.zero;
+        cachedArenaRadius = 0f;
+
+        if (string.IsNullOrWhiteSpace(geodeBoundaryPrefix)) return;
+
+        Transform[] transforms = FindObjectsByType<Transform>(FindObjectsInactive.Include);
+        Vector3 sum = Vector3.zero;
+        int count = 0;
+
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform candidate = transforms[i];
+            if (candidate == null) continue;
+            if (!candidate.name.StartsWith(geodeBoundaryPrefix, System.StringComparison.OrdinalIgnoreCase)) continue;
+
+            sum += candidate.position;
+            count++;
+        }
+
+        if (count < 3) return;
+
+        Vector3 arenaCenter = sum / count;
+        float nearestBoundaryDistance = float.PositiveInfinity;
+
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform candidate = transforms[i];
+            if (candidate == null) continue;
+            if (!candidate.name.StartsWith(geodeBoundaryPrefix, System.StringComparison.OrdinalIgnoreCase)) continue;
+
+            Vector2 delta = new Vector2(candidate.position.x - arenaCenter.x, candidate.position.z - arenaCenter.z);
+            float distance = delta.magnitude;
+            if (distance > 0.1f && distance < nearestBoundaryDistance)
+            {
+                nearestBoundaryDistance = distance;
+            }
+        }
+
+        if (float.IsInfinity(nearestBoundaryDistance)) return;
+
+        cachedArenaCenter = arenaCenter;
+        cachedArenaRadius = Mathf.Max(1f, nearestBoundaryDistance - Mathf.Max(0f, boundaryPadding));
     }
 
     private Vector3 ResolveGroundDropPosition(Vector3 horizontalPosition, Vector2 jitter)

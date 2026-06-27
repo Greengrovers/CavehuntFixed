@@ -234,10 +234,13 @@ public class AmmoHud : MonoBehaviour
     [SerializeField] private int progressFontSize = 38;
 
     [Header("Hand Score Tuning")]
-    [SerializeField] private Vector3 handScoreLocalOffset = new Vector3(0.015f, 0.03f, -0.005f);
+    [SerializeField] private Vector3 handScoreLocalOffset = new Vector3(0.04f, 0.0f, 0.0f);
     [SerializeField] private Vector3 handScoreRotationOffset = Vector3.zero;
     [SerializeField] private Vector3 scoreTextRotationOffset = Vector3.zero;
-    [SerializeField] private float handScoreSurfaceOffset = -0.02f;
+    [SerializeField] private float handScoreSurfaceOffset = -0.025f;
+    [SerializeField] private Vector3 rightHandScoreLocalOffset = new Vector3(-0.04f, 0.0f, 0.0f);
+    [SerializeField] private Vector3 rightHandScoreRotationOffset = new Vector3(0f, 180f, 0f);
+    [SerializeField] private float rightHandScoreSurfaceOffset = -0.025f;
     [SerializeField] private float handScoreScale = 0.00055f;
 
     private static readonly AmmoType[] DisplayOrder =
@@ -521,15 +524,28 @@ public class AmmoHud : MonoBehaviour
             poseAnchor = anchor;
         }
 
-        Quaternion scoreRotation = poseAnchor.rotation * Quaternion.Euler(handScoreRotationOffset);
-        Vector3 scorePosition = poseAnchor.TransformPoint(handScoreLocalOffset);
-        Vector3 surfaceOffset = scoreRotation * Vector3.forward * handScoreSurfaceOffset;
+                bool useRightHandScorePose = IsRightHandPoseAnchor(poseAnchor);
+        Vector3 localOffset = useRightHandScorePose ? rightHandScoreLocalOffset : handScoreLocalOffset;
+        Vector3 rotationOffset = useRightHandScorePose ? rightHandScoreRotationOffset : handScoreRotationOffset;
+        float surfaceOffsetDistance = useRightHandScorePose ? rightHandScoreSurfaceOffset : handScoreSurfaceOffset;
+
+        Quaternion scoreRotation = poseAnchor.rotation * Quaternion.Euler(rotationOffset);
+        Vector3 scorePosition = poseAnchor.TransformPoint(localOffset);
+        Vector3 surfaceOffset = scoreRotation * Vector3.forward * surfaceOffsetDistance;
 
         handScoreCanvasRect.SetParent(null, true);
         handScoreCanvasRect.position = scorePosition + surfaceOffset;
         handScoreCanvasRect.rotation = scoreRotation;
         handScoreCanvasRect.localScale = Vector3.one * handScoreScale;
     }
+    private static bool IsRightHandPoseAnchor(Transform poseAnchor)
+    {
+        if (poseAnchor == null) return false;
+
+        string name = poseAnchor.name.ToLowerInvariant();
+        return name.Contains("_r_") || name.Contains(":b_r_") || name.Contains("rhand") || name.Contains("right");
+    }
+
 
     private static Transform ResolveNearestHandBone(Transform reference)
     {

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Damageable))]
@@ -123,6 +123,10 @@ public class BatEnemy : MonoBehaviour
     public void SetDescendSpeed(float speed)
     {
         descendSpeed = Mathf.Max(0.05f, speed);
+    }
+    public void SetBulletSpeed(float speed)
+    {
+        bulletSpeed = Mathf.Max(0.1f, speed);
     }
 
     public void SetRespawnOnDeath(bool enabled)

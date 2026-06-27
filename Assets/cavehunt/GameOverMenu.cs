@@ -338,7 +338,8 @@ public class GameOverMenu : MonoBehaviour
         backgroundImage.color = Color.white;
         backgroundImage.Curve = backgroundCurve;
         backgroundImage.Segments = backgroundCurveSegments;
-        ApplyBackground(backgroundResourcePath);
+                ApplySharedBackgroundRect();
+ApplyBackground(backgroundResourcePath);
     }
 
     private void ApplyContent(string title, string hint, string backgroundPath)
@@ -348,9 +349,22 @@ public class GameOverMenu : MonoBehaviour
         if (titleLabel != null) titleLabel.text = title;
         if (hintLabel != null) hintLabel.text = hint;
         if (titleWorldLabel != null) titleWorldLabel.text = title;
-        if (hintWorldLabel != null) hintWorldLabel.text = hint;
-
+        if (hintWorldLabel != null) hintWorldLabel.text = hint;        ApplySharedBackgroundRect();
         ApplyBackground(backgroundPath);
+    }
+
+    private void ApplySharedBackgroundRect()
+    {
+        if (backgroundImage == null) return;
+
+        RectTransform rect = backgroundImage.rectTransform;
+        rect.anchorMin = new Vector2(-0.12f, -0.08f);
+        rect.anchorMax = new Vector2(1.12f, 1.08f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.localPosition = Vector3.zero;
+        rect.localScale = Vector3.one;
+        backgroundImage.uvRect = new Rect(0f, 0f, 1f, 1f);
     }
 
     private void ApplyScoreText(string text, bool visibleScore)
