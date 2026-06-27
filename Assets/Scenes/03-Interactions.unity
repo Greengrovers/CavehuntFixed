@@ -839,7 +839,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 534873807378351678, guid: 7b003d8ebbb5a5541891410ceb72cefc, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -1.04235
+      value: -4.62
       objectReference: {fileID: 0}
     - target: {fileID: 534873807378351678, guid: 7b003d8ebbb5a5541891410ceb72cefc, type: 3}
       propertyPath: m_LocalPosition.z
@@ -2367,7 +2367,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.59, y: 2, z: 5}
+  m_Size: {x: 3, y: 2.08, z: 5}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1001 &785514113
 PrefabInstance:
@@ -2919,7 +2919,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.5, y: 2, z: 5}
+  m_Size: {x: 3, y: 2, z: 5}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1016262714
 GameObject:
@@ -3373,7 +3373,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.53, y: 2, z: 5}
+  m_Size: {x: 3, y: 2, z: 5}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1115622675
 GameObject:
@@ -4461,7 +4461,7 @@ MonoBehaviour:
   pickupArrowColor: {r: 0.45, g: 0.9, b: 1, a: 1}
   pickupArrowHeight: 2.4
   pickupArrowScale: 0.9
-  trapSpawnChance: 0.24
+  trapSpawnChance: 0
   spikeTrapTemplate: {fileID: 0}
   spikeTrapSceneObjectName: Trap
   trapPlayerSpacing: 6
@@ -4780,7 +4780,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1632504712}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 19f40490f817c9842b620bf958358661, type: 3}
   m_Name: 
@@ -5593,13 +5593,13 @@ MonoBehaviour:
   disableBowGrabCollidersWhileHeld: 1
   defaultStringColor: {r: 1, g: 1, b: 1, a: 1}
   readyStringGoalColor: {r: 0, g: 1, b: 0, a: 1}
-  shootForceMultiplier: 35
+  shootForceMultiplier: 20
   useStringGoalAsTriggerPoint: 1
-  requiredPullAmountToShoot: 0.78
+  requiredPullAmountToShoot: 1
   stringWidth: 0.008
   clampPullPointLocalX: 1
   minPullPointLocalX: 0.5
-  maxPullPointLocalX: 0.91
+  maxPullPointLocalX: 1
 --- !u!114 &1806798303
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5811,13 +5811,13 @@ MonoBehaviour:
   disableBowGrabCollidersWhileHeld: 1
   defaultStringColor: {r: 1, g: 1, b: 1, a: 1}
   readyStringGoalColor: {r: 0, g: 1, b: 0, a: 1}
-  shootForceMultiplier: 21.1
+  shootForceMultiplier: 15
   useStringGoalAsTriggerPoint: 1
-  requiredPullAmountToShoot: 0.608
+  requiredPullAmountToShoot: 1
   stringWidth: 0.008
   clampPullPointLocalX: 1
   minPullPointLocalX: 0.5
-  maxPullPointLocalX: 0.7
+  maxPullPointLocalX: 0.94
 --- !u!1001 &1841120177
 PrefabInstance:
   m_ObjectHideFlags: 0

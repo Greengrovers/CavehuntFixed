@@ -201,19 +201,6 @@ public class PlayerHealth : MonoBehaviour
             GUI.Label(new Rect(16f, 16f, 180f, 28f), $"Health {currentHealth:0}/{maxHealth:0}");
         }
 
-        if (!menuVisible)
-        {
-            GUI.depth = previousDepth;
-            GUI.color = Color.white;
-            GUIStyle scoreStyle = new GUIStyle(GUI.skin.label)
-            {
-                alignment = TextAnchor.UpperRight,
-                fontSize = 24,
-                fontStyle = FontStyle.Bold
-            };
-            GUI.Label(new Rect(Screen.width - 276f, 16f, 260f, 34f), $"Score {CavehuntScoreSystem.Score}", scoreStyle);
-        }
-
         GUI.color = previousColor;
         GUI.depth = previousDepth;
     }

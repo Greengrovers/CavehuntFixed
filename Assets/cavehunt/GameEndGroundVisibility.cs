@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public static class GameEndGroundVisibility
@@ -58,6 +58,7 @@ public static class GameEndGroundVisibility
         {
             string name = current.name.ToLowerInvariant();
             if (name.Contains("ground fog")) return true;
+            if (name == "ground" || name.Contains("ground ")) return true;
             if (name.Contains("ground mesh")) return true;
             if (name.Contains("floor")) return true;
             if (name.Contains("boden")) return true;

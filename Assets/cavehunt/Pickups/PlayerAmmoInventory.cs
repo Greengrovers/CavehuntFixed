@@ -2,6 +2,7 @@
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 using UnityEngine.UI;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 public class PlayerAmmoInventory : MonoBehaviour
 {
@@ -223,14 +224,21 @@ public class AmmoHud : MonoBehaviour
     [SerializeField] private Vector2 canvasSize = new Vector2(480f, 92f);
     [SerializeField] private Vector2 slotSize = new Vector2(92f, 78f);
     [SerializeField] private float slotGap = 16f;
-    [SerializeField] private Vector2 topHudLocalOffset = new Vector2(0f, 0.55f);
-    [SerializeField] private Vector2 topHudCanvasSize = new Vector2(900f, 130f);
-    [SerializeField] private Vector2 scoreSize = new Vector2(360f, 78f);
-    [SerializeField] private Vector2 scoreOffset = new Vector2(255f, 0f);
-    [SerializeField] private Vector2 progressSize = new Vector2(360f, 96f);
-    [SerializeField] private Vector2 progressOffset = new Vector2(-255f, 0f);
-    [SerializeField] private int scoreFontSize = 44;
+    [SerializeField] private Vector2 topHudLocalOffset = new Vector2(0f, 0.52f);
+    [SerializeField] private Vector2 topHudCanvasSize = new Vector2(860f, 88f);
+    [SerializeField] private Vector2 scoreSize = new Vector2(210f, 210f);
+    [SerializeField] private Vector2 scoreOffset = Vector2.zero;
+    [SerializeField] private Vector2 progressSize = new Vector2(740f, 76f);
+    [SerializeField] private Vector2 progressOffset = Vector2.zero;
+    [SerializeField] private int scoreFontSize = 28;
     [SerializeField] private int progressFontSize = 38;
+
+    [Header("Hand Score Tuning")]
+    [SerializeField] private Vector3 handScoreLocalOffset = new Vector3(0.015f, 0.03f, -0.005f);
+    [SerializeField] private Vector3 handScoreRotationOffset = Vector3.zero;
+    [SerializeField] private Vector3 scoreTextRotationOffset = Vector3.zero;
+    [SerializeField] private float handScoreSurfaceOffset = -0.02f;
+    [SerializeField] private float handScoreScale = 0.00055f;
 
     private static readonly AmmoType[] DisplayOrder =
     {
@@ -245,6 +253,8 @@ public class AmmoHud : MonoBehaviour
     private RectTransform canvasRect;
     private Canvas topHudCanvas;
     private RectTransform topHudCanvasRect;
+    private Canvas handScoreCanvas;
+    private RectTransform handScoreCanvasRect;
     private AmmoSlot[] slots;
     private Text scoreLabel;
     private Text scoreShadow;
@@ -282,12 +292,14 @@ public class AmmoHud : MonoBehaviour
     {
         BuildHud();
         BuildTopHud();
+        BuildHandScoreHud();
     }
 
     private void LateUpdate()
     {
         EnsureCameraParent();
         EnsureTopHudCameraParent();
+        EnsureHandScoreHud();
         UpdateHud();
         UpdateTopHud();
     }
@@ -343,27 +355,50 @@ public class AmmoHud : MonoBehaviour
         CanvasScaler scaler = root.AddComponent<CanvasScaler>();
         scaler.dynamicPixelsPerUnit = 10f;
 
-        progressShadow = CreateText("Progress Shadow", topHudCanvasRect, "Outer: 0/0\nInner: 0/0", progressFontSize, progressSize, progressOffset + new Vector2(3f, -3f));
+        progressShadow = CreateText("Progress Shadow", topHudCanvasRect, "Outer: 0/0   Inner: 0/0", progressFontSize, progressSize, progressOffset + new Vector2(3f, -3f));
         progressShadow.color = new Color(0f, 0f, 0f, 0.9f);
         progressShadow.fontStyle = FontStyle.Bold;
-        progressShadow.alignment = TextAnchor.MiddleLeft;
+        progressShadow.alignment = TextAnchor.MiddleCenter;
 
-        progressLabel = CreateText("Progress", topHudCanvasRect, "Outer: 0/0\nInner: 0/0", progressFontSize, progressSize, progressOffset);
+        progressLabel = CreateText("Progress", topHudCanvasRect, "Outer: 0/0   Inner: 0/0", progressFontSize, progressSize, progressOffset);
         progressLabel.color = Color.white;
         progressLabel.fontStyle = FontStyle.Bold;
-        progressLabel.alignment = TextAnchor.MiddleLeft;
-
-        scoreShadow = CreateText("Score Shadow", topHudCanvasRect, "Score: 0", scoreFontSize, scoreSize, scoreOffset + new Vector2(3f, -3f));
-        scoreShadow.color = new Color(0f, 0f, 0f, 0.9f);
-        scoreShadow.fontStyle = FontStyle.Bold;
-        scoreShadow.alignment = TextAnchor.MiddleRight;
-
-        scoreLabel = CreateText("Score", topHudCanvasRect, "Score: 0", scoreFontSize, scoreSize, scoreOffset);
-        scoreLabel.color = Color.white;
-        scoreLabel.fontStyle = FontStyle.Bold;
-        scoreLabel.alignment = TextAnchor.MiddleRight;
+        progressLabel.alignment = TextAnchor.MiddleCenter;
 
         EnsureTopHudCameraParent();
+        UpdateTopHud();
+    }
+
+    private void BuildHandScoreHud()
+    {
+        if (handScoreCanvas != null) return;
+
+        GameObject root = new GameObject("Hand Score HUD");
+        root.transform.SetParent(transform, false);
+
+        handScoreCanvas = root.AddComponent<Canvas>();
+        handScoreCanvas.renderMode = RenderMode.WorldSpace;
+        handScoreCanvas.sortingOrder = 34;
+
+        handScoreCanvasRect = root.GetComponent<RectTransform>();
+        handScoreCanvasRect.sizeDelta = scoreSize;
+        handScoreCanvasRect.localScale = Vector3.one * handScoreScale;
+
+        CanvasScaler scaler = root.AddComponent<CanvasScaler>();
+        scaler.dynamicPixelsPerUnit = 10f;
+        scoreShadow = CreateText("Score Shadow", handScoreCanvasRect, "Score: 0", scoreFontSize, scoreSize, new Vector2(3f, -3f));
+        scoreShadow.color = new Color(0f, 0f, 0f, 0.9f);
+        scoreShadow.fontStyle = FontStyle.Bold;
+        scoreShadow.alignment = TextAnchor.MiddleCenter;
+        scoreShadow.rectTransform.localRotation = Quaternion.Euler(scoreTextRotationOffset);
+
+        scoreLabel = CreateText("Score", handScoreCanvasRect, "Score: 0", scoreFontSize, scoreSize, Vector2.zero);
+        scoreLabel.color = Color.white;
+        scoreLabel.fontStyle = FontStyle.Bold;
+        scoreLabel.alignment = TextAnchor.MiddleCenter;
+        scoreLabel.rectTransform.localRotation = Quaternion.Euler(scoreTextRotationOffset);
+
+        EnsureHandScoreHud();
         UpdateTopHud();
     }
 
@@ -470,6 +505,82 @@ public class AmmoHud : MonoBehaviour
         topHudCanvasRect.localScale = Vector3.one * 0.00145f;
     }
 
+    private void EnsureHandScoreHud()
+    {
+        if (handScoreCanvasRect == null) return;
+
+        Camera camera = ResolveHudCamera();
+        Transform anchor = ResolveBowHoldingHand();
+        bool shouldShow = camera != null && anchor != null;
+        handScoreCanvasRect.gameObject.SetActive(shouldShow);
+        if (!shouldShow) return;
+
+        Transform poseAnchor = ResolveNearestHandBone(anchor);
+        if (poseAnchor == null)
+        {
+            poseAnchor = anchor;
+        }
+
+        Quaternion scoreRotation = poseAnchor.rotation * Quaternion.Euler(handScoreRotationOffset);
+        Vector3 scorePosition = poseAnchor.TransformPoint(handScoreLocalOffset);
+        Vector3 surfaceOffset = scoreRotation * Vector3.forward * handScoreSurfaceOffset;
+
+        handScoreCanvasRect.SetParent(null, true);
+        handScoreCanvasRect.position = scorePosition + surfaceOffset;
+        handScoreCanvasRect.rotation = scoreRotation;
+        handScoreCanvasRect.localScale = Vector3.one * handScoreScale;
+    }
+
+    private static Transform ResolveNearestHandBone(Transform reference)
+    {
+        Transform best = ResolveNearestNamedHandTransform(reference, "hands:b_l_hand", "hands:b_r_hand", 0.45f);
+        if (best != null) return best;
+
+        best = ResolveNearestNamedHandTransform(reference, "hands:b_l_grip", "hands:b_r_grip", 0.45f);
+        if (best != null) return best;
+
+        return ResolveNearestNamedHandTransform(reference, "hands:Lhand", "hands:Rhand", 0.6f);
+    }
+
+    private static Transform ResolveNearestNamedHandTransform(Transform reference, string leftName, string rightName, float maxDistance)
+    {
+        if (reference == null) return null;
+
+        Transform[] transforms = FindObjectsByType<Transform>(FindObjectsInactive.Exclude);
+        Transform best = null;
+        float bestDistanceSqr = maxDistance * maxDistance;
+
+        for (int i = 0; i < transforms.Length; i++)
+        {
+            Transform candidate = transforms[i];
+            if (candidate == null) continue;
+            if (candidate.name != leftName && candidate.name != rightName) continue;
+
+            float distanceSqr = (candidate.position - reference.position).sqrMagnitude;
+            if (distanceSqr >= bestDistanceSqr) continue;
+
+            bestDistanceSqr = distanceSqr;
+            best = candidate;
+        }
+
+        return best;
+    }
+    private static Transform ResolveBowHoldingHand()
+    {
+        BowStartExperience[] bows = FindObjectsByType<BowStartExperience>(FindObjectsInactive.Exclude);
+        for (int i = 0; i < bows.Length; i++)
+        {
+            BowStartExperience bow = bows[i];
+            if (bow == null) continue;
+
+            XRGrabInteractable grabInteractable = bow.GetComponent<XRGrabInteractable>();
+            if (grabInteractable == null || !grabInteractable.isSelected || grabInteractable.interactorsSelecting.Count == 0) continue;
+
+            return grabInteractable.interactorsSelecting[0]?.transform;
+        }
+
+        return null;
+    }
     private static Camera ResolveHudCamera()
     {
         Camera camera = Camera.main;
@@ -525,7 +636,7 @@ public class AmmoHud : MonoBehaviour
 
     private void UpdateTopHud()
     {
-        if (scoreLabel == null || progressLabel == null) return;
+        if (progressLabel == null) return;
 
         if (encounterDirector == null)
         {
@@ -541,7 +652,11 @@ public class AmmoHud : MonoBehaviour
         if (currentScore != lastScore)
         {
             string scoreText = $"Score: {currentScore}";
-            scoreLabel.text = scoreText;
+            if (scoreLabel != null)
+            {
+                scoreLabel.text = scoreText;
+            }
+
             if (scoreShadow != null)
             {
                 scoreShadow.text = scoreText;
@@ -552,7 +667,7 @@ public class AmmoHud : MonoBehaviour
 
         if (outerKills != lastOuterKills || innerKills != lastInnerKills || outerTarget != lastOuterTarget || innerTarget != lastInnerTarget)
         {
-            string progressText = $"Outer: {outerKills}/{outerTarget}\nInner: {innerKills}/{innerTarget}";
+            string progressText = $"Outer: {outerKills}/{outerTarget}   Inner: {innerKills}/{innerTarget}";
             progressLabel.text = progressText;
             if (progressShadow != null)
             {

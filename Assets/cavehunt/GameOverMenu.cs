@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -20,15 +20,15 @@ public class GameOverMenu : MonoBehaviour
     [SerializeField] private string gameOverHintText = "The cave claimed this run.";
     [SerializeField] private string gameWonTitleText = "Game Won";
     [SerializeField] private string gameWonHintText = "The cave is yours.";
-    [SerializeField] private float menuDistance = 1.0f;
-    [SerializeField] private Vector2 canvasSize = new Vector2(900f, 1120f);
-    [SerializeField] private float canvasScale = 0.0026f;
+    [SerializeField] private float menuDistance = 1.45f;
+    [SerializeField] private Vector2 canvasSize = new Vector2(1250f, 1250f);
+    [SerializeField] private float canvasScale = 0.00217f;
     [SerializeField] private float backgroundCurve = 2f;
     [SerializeField] private int backgroundCurveSegments = 40;
     [SerializeField] private Color titleColor = Color.white;
     [SerializeField] private Color hintColor = Color.white;
     [SerializeField] private Color buttonColor = new Color(0.035f, 0.035f, 0.035f, 1f);
-    [SerializeField] private Color selectedButtonColor = new Color(0.13f, 0.13f, 0.12f, 1f);
+    [SerializeField] private Color selectedButtonColor = new Color(0.42f, 0.42f, 0.34f, 1f);
     [SerializeField] private Color selectedTextColor = Color.white;
     [SerializeField] private Color normalTextColor = Color.white;
     [SerializeField] private float navigationRepeatDelay = 0.22f;
@@ -57,6 +57,7 @@ public class GameOverMenu : MonoBehaviour
     private float previousTimeScale = 1f;
     private bool previousAudioPause;
     private bool previousXRConfirmPressed;
+    private bool menuPlacedForCurrentShow;
     private Coroutine pendingActionRoutine;
 
     public bool IsVisible => visible;
@@ -108,7 +109,7 @@ public class GameOverMenu : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (visible)
+        if (visible && !menuPlacedForCurrentShow)
         {
             PositionInFrontOfCamera();
         }
@@ -130,6 +131,7 @@ public class GameOverMenu : MonoBehaviour
         visible = true;
         pendingActionRoutine = null;
         selectedIndex = 0;
+        menuPlacedForCurrentShow = false;
         ApplyButtonColorDefaults();
 
         if (!HasScoreText())
@@ -174,7 +176,7 @@ public class GameOverMenu : MonoBehaviour
     private void ApplyButtonColorDefaults()
     {
         buttonColor = new Color(0.035f, 0.035f, 0.035f, 1f);
-        selectedButtonColor = new Color(0.13f, 0.13f, 0.12f, 1f);
+        selectedButtonColor = new Color(0.42f, 0.42f, 0.34f, 1f);
     }
     private void HideOtherMenus()
     {
@@ -325,8 +327,8 @@ public class GameOverMenu : MonoBehaviour
         backgroundObject.transform.SetAsFirstSibling();
 
         RectTransform rect = backgroundObject.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(-0.0775f, 0.032f);
-        rect.anchorMax = new Vector2(1.0775f, 0.648f);
+        rect.anchorMin = new Vector2(-0.12f, -0.08f);
+        rect.anchorMax = new Vector2(1.12f, 1.08f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
         rect.localPosition = Vector3.zero;
@@ -641,17 +643,27 @@ public class GameOverMenu : MonoBehaviour
         if (camera == null) return;
 
         Transform cameraTransform = camera.transform;
+        Vector3 flatForward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up);
 
-        canvasRect.position =
-            cameraTransform.position +
-            cameraTransform.forward * Mathf.Max(0.55f, menuDistance);
+        if (flatForward.sqrMagnitude < 0.0001f)
+        {
+            flatForward = Vector3.ProjectOnPlane(cameraTransform.up, Vector3.up);
+        }
 
-        canvasRect.rotation = Quaternion.LookRotation(
-            canvasRect.position - cameraTransform.position,
-            Vector3.up
-        );
+        if (flatForward.sqrMagnitude < 0.0001f)
+        {
+            flatForward = Vector3.forward;
+        }
 
+        flatForward.Normalize();
+
+        Vector3 lockedCenter = cameraTransform.position + flatForward * Mathf.Max(0.55f, menuDistance);
+        lockedCenter.y = cameraTransform.position.y;
+
+        canvasRect.position = lockedCenter;
+        canvasRect.rotation = Quaternion.LookRotation(flatForward, Vector3.up);
         canvasRect.localScale = Vector3.one * canvasScale;
+        menuPlacedForCurrentShow = true;
         UpdateWorldTextTransform(camera);
     }
 
