@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Rendering;
 
 public class BowArrowSpawner : MonoBehaviour
@@ -10,7 +10,7 @@ public class BowArrowSpawner : MonoBehaviour
 
     [Header("Shoot Settings")]
     [SerializeField] private float shootForce = 20f;
-    [SerializeField] private float airForceMultiplier = 2f;
+    [SerializeField] private float airForceMultiplier = 3f;
     [SerializeField] private float airShotOffset = 0.16f;
     [SerializeField] private bool clampNockedArrowMovement = true;
     [SerializeField] private float maxNockedArrowPullDistance = 0.41f;

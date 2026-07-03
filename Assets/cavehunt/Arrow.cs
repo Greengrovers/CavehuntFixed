@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class Arrow : MonoBehaviour
@@ -206,7 +206,7 @@ public class Arrow : MonoBehaviour
             segment / distance,
             distance,
             ~0,
-            QueryTriggerInteraction.Ignore
+            QueryTriggerInteraction.Collide
         );
 
         float nearestDistance = float.PositiveInfinity;

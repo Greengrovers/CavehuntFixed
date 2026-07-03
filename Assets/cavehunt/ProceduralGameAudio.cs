@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class ProceduralGameAudio : MonoBehaviour
 {
@@ -20,6 +20,7 @@ public class ProceduralGameAudio : MonoBehaviour
     private AudioClip gameWonMusicClip;
     private AudioClip airPickupClip;
     private AudioClip pickupClip;
+    private AudioClip pickupDropClip;
     private AudioClip bowReadyClip;
     private AudioClip arrowShotClip;
     private AudioClip explosionClip;
@@ -42,6 +43,12 @@ public class ProceduralGameAudio : MonoBehaviour
     {
         ProceduralGameAudio audio = EnsureInstance();
         audio.PlayAt(position, audio.pickupClip ??= audio.CreatePickupClip(), 0.55f, 0.55f);
+    }
+
+    public static void PlayPickupDrop(Vector3 position)
+    {
+        ProceduralGameAudio audio = EnsureInstance();
+        audio.PlayAt(position, audio.pickupDropClip ??= audio.CreatePickupDropClip(), 1.3f, 1f, 8f, 100f, AudioRolloffMode.Linear);
     }
 
     public static void PlayBowReady(Vector3 position)
@@ -249,6 +256,17 @@ public class ProceduralGameAudio : MonoBehaviour
 
     private void PlayAt(Vector3 position, AudioClip clip, float localVolume, float spatialBlend)
     {
+        PlayAt(position, clip, localVolume, spatialBlend, 1.2f, 25f);
+    }
+
+    private void PlayAt(Vector3 position, AudioClip clip, float localVolume, float spatialBlend, float minDistance, float maxDistance)
+    {
+        AudioRolloffMode rolloffMode = spatialBlend >= 0.99f ? AudioRolloffMode.Logarithmic : AudioRolloffMode.Linear;
+        PlayAt(position, clip, localVolume, spatialBlend, minDistance, maxDistance, rolloffMode);
+    }
+
+    private void PlayAt(Vector3 position, AudioClip clip, float localVolume, float spatialBlend, float minDistance, float maxDistance, AudioRolloffMode rolloffMode)
+    {
         if (clip == null) return;
 
         GameObject soundObject = new GameObject("Procedural SFX");
@@ -258,9 +276,11 @@ public class ProceduralGameAudio : MonoBehaviour
         source.clip = clip;
         source.volume = Mathf.Clamp01(localVolume * sfxVolume);
         source.spatialBlend = Mathf.Clamp01(spatialBlend);
-        source.minDistance = 1.2f;
-        source.maxDistance = 25f;
-        source.rolloffMode = AudioRolloffMode.Linear;
+        source.minDistance = Mathf.Max(0.01f, minDistance);
+        source.maxDistance = Mathf.Max(source.minDistance + 0.1f, maxDistance);
+        source.rolloffMode = rolloffMode;
+        source.spread = 0f;
+        source.dopplerLevel = spatialBlend >= 0.99f ? 0.15f : 0f;
         source.Play();
 
         Destroy(soundObject, clip.length + 0.1f);
@@ -314,6 +334,22 @@ public class ProceduralGameAudio : MonoBehaviour
         });
 
         return CreateClip("DMCA Free Pickup Chime", samples);
+    }
+
+    private AudioClip CreatePickupDropClip()
+    {
+        float seconds = 1.15f;
+        float[] samples = CreateSamples(seconds, (time, progress) =>
+        {
+            float bellEnv = Mathf.Exp(-progress * 3.1f);
+            float shimmer = (Sine(time, 659.25f) + Sine(time, 987.77f) * 0.7f + Sine(time, 1318.51f) * 0.45f) * bellEnv * 0.5f;
+            float ping = Sine(time, Mathf.Lerp(1760f, 1174.66f, progress)) * Mathf.Exp(-progress * 8f) * 0.28f;
+            float dropThump = Sine(time, Mathf.Lerp(160f, 62f, progress)) * Mathf.Exp(-progress * 10f) * 0.32f;
+            float air = NextNoise() * Mathf.Sin(progress * Mathf.PI) * 0.08f;
+            return shimmer + ping + dropThump + air;
+        });
+
+        return CreateClip("DMCA Free Pickup Drop Direction Chime", samples);
     }
 
     private AudioClip CreateBowReadyClip()

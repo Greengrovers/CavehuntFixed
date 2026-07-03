@@ -366,6 +366,7 @@ public class CavehuntEncounterDirector : MonoBehaviour
         phase = EncounterPhase.Boss;
         StopRingSpawners();
         bossEnemy.BeginBossEncounter(bossSpawnPoint, difficultySettings);
+        ShowBossHealthBar();
         ProceduralGameAudio.StartBossMusic();
 
         Debug.Log("Cavehunt encounter advanced: Boss phase.");
@@ -472,6 +473,8 @@ public class CavehuntEncounterDirector : MonoBehaviour
         phase = EncounterPhase.Victory;
         StopRingSpawners();
         ProceduralGameAudio.StopBossMusic(false);
+        HideBossHealthBar();
+        PlayerAmmoInventory.ResetAllAmmoInventories();
         CavehuntRuntimeCleanup.DestroyGameplayLeftovers();
         PlayerHealth playerHealth = FindAnyObjectByType<PlayerHealth>(FindObjectsInactive.Include);
         if (playerHealth != null)
@@ -483,5 +486,27 @@ public class CavehuntEncounterDirector : MonoBehaviour
 
         onVictory?.Invoke();
         Debug.Log("Cavehunt encounter complete: Boss defeated. Victory.");
+    }
+
+    private void HideBossHealthBar()
+    {
+        if (bossEnemy == null) return;
+
+        EnemyHealthBar healthBar = bossEnemy.GetComponent<EnemyHealthBar>();
+        if (healthBar != null)
+        {
+            healthBar.Hide();
+        }
+    }
+
+    private void ShowBossHealthBar()
+    {
+        if (bossEnemy == null) return;
+
+        EnemyHealthBar healthBar = bossEnemy.GetComponent<EnemyHealthBar>();
+        if (healthBar != null)
+        {
+            healthBar.Show();
+        }
     }
 }

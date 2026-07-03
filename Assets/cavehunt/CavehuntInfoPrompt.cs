@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -7,17 +7,21 @@ using UnityEngine.XR;
 public class CavehuntInfoPrompt : MonoBehaviour
 {
     private const string GameplaySceneName = "03-Interactions";
+    private const string StartupSplashResourcePath = "Intro/cavehunt_mechanics_overview";
 
     private enum PromptStyle
     {
         Screen,
+        ImageScreen,
         TextOnly
     }
 
     private static CavehuntInfoPrompt instance;
 
     private GameObject visualRoot;
+    private Transform screenTransform;
     private MeshRenderer screenRenderer;
+    private Material screenMaterial;
     private TextMesh titleLabel;
     private TextMesh bodyLabel;
     private TextMesh confirmLabel;
@@ -74,14 +78,7 @@ public class CavehuntInfoPrompt : MonoBehaviour
     private IEnumerator ShowStartupSplashAfterFrame()
     {
         yield return null;
-
-        ShowInternal(
-            "CAVEHUNT",
-            "Pick up the bow, choose a difficulty, defeat the bats, then beat the boss.",
-            null,
-            true,
-            PromptStyle.Screen
-        );
+        ShowInternal(string.Empty, string.Empty, null, true, PromptStyle.ImageScreen);
     }
 
     private void Awake()
@@ -177,7 +174,7 @@ public class CavehuntInfoPrompt : MonoBehaviour
         GameObject screen = GameObject.CreatePrimitive(PrimitiveType.Quad);
         screen.name = "Prompt Screen";
         screen.transform.SetParent(visualRoot.transform, false);
-        screen.transform.localScale = new Vector3(2.45f, 1.35f, 1f);
+        screenTransform = screen.transform;
 
         Collider collider = screen.GetComponent<Collider>();
         if (collider != null)
@@ -200,10 +197,10 @@ public class CavehuntInfoPrompt : MonoBehaviour
 
             if (shader != null)
             {
-                Material material = new Material(shader);
-                material.name = "Cavehunt Info Prompt Screen Material";
-                material.color = new Color(0.015f, 0.018f, 0.024f, 0.96f);
-                screenRenderer.sharedMaterial = material;
+                screenMaterial = new Material(shader);
+                screenMaterial.name = "Cavehunt Info Prompt Screen Material";
+                screenMaterial.color = new Color(0.015f, 0.018f, 0.024f, 0.96f);
+                screenRenderer.sharedMaterial = screenMaterial;
             }
         }
 
@@ -244,18 +241,40 @@ public class CavehuntInfoPrompt : MonoBehaviour
 
     private void ConfigureStyle(PromptStyle style)
     {
-        bool showScreen = style == PromptStyle.Screen;
+        bool imageScreen = style == PromptStyle.ImageScreen;
+        bool textScreen = style == PromptStyle.Screen;
+        bool showScreen = imageScreen || textScreen;
+
         if (screenRenderer != null)
         {
             screenRenderer.gameObject.SetActive(showScreen);
         }
 
-        titleLabel.fontSize = showScreen ? 86 : 70;
-        titleLabel.characterSize = showScreen ? 0.030f : 0.032f;
-        bodyLabel.fontSize = showScreen ? 52 : 44;
-        bodyLabel.characterSize = showScreen ? 0.018f : 0.020f;
-        confirmLabel.fontSize = showScreen ? 42 : 36;
-        confirmLabel.characterSize = showScreen ? 0.016f : 0.017f;
+        if (screenMaterial != null)
+        {
+            screenMaterial.mainTexture = imageScreen ? Resources.Load<Texture2D>(StartupSplashResourcePath) : null;
+            screenMaterial.color = imageScreen
+                ? Color.white
+                : new Color(0.015f, 0.018f, 0.024f, 0.96f);
+        }
+
+        if (screenTransform != null)
+        {
+            screenTransform.localScale = imageScreen
+                ? new Vector3(2.7f, 1.52f, 1f)
+                : new Vector3(2.45f, 1.35f, 1f);
+        }
+
+        titleLabel.gameObject.SetActive(textScreen || style == PromptStyle.TextOnly);
+        bodyLabel.gameObject.SetActive(textScreen || style == PromptStyle.TextOnly);
+        confirmLabel.gameObject.SetActive(true);
+
+        titleLabel.fontSize = textScreen ? 86 : 70;
+        titleLabel.characterSize = textScreen ? 0.030f : 0.032f;
+        bodyLabel.fontSize = textScreen ? 52 : 44;
+        bodyLabel.characterSize = textScreen ? 0.018f : 0.020f;
+        confirmLabel.fontSize = imageScreen ? 34 : (textScreen ? 42 : 36);
+        confirmLabel.characterSize = imageScreen ? 0.012f : (textScreen ? 0.016f : 0.017f);
     }
 
     private void PositionInFrontOfCamera()
@@ -274,17 +293,22 @@ public class CavehuntInfoPrompt : MonoBehaviour
         }
 
         flatForward.Normalize();
-        float distance = currentStyle == PromptStyle.Screen ? 1.45f : 1.85f;
+        bool imageScreen = currentStyle == PromptStyle.ImageScreen;
+        float distance = imageScreen ? 1.65f : (currentStyle == PromptStyle.Screen ? 1.45f : 1.85f);
         Vector3 center = cameraTransform.position + flatForward * distance;
-        center.y = cameraTransform.position.y + (currentStyle == PromptStyle.Screen ? 0f : 0.08f);
+        center.y = cameraTransform.position.y + (currentStyle == PromptStyle.TextOnly ? 0.08f : 0f);
 
         Quaternion rotation = Quaternion.LookRotation(flatForward, Vector3.up);
         visualRoot.transform.position = center;
         visualRoot.transform.rotation = rotation;
         visualRoot.transform.localScale = Vector3.one;
 
-        float textZ = -0.045f;
-        if (currentStyle == PromptStyle.Screen)
+        float textZ = -0.055f;
+        if (imageScreen)
+        {
+            SetLocalText(confirmLabel, new Vector3(0f, -0.86f, textZ));
+        }
+        else if (currentStyle == PromptStyle.Screen)
         {
             SetLocalText(titleLabel, new Vector3(0f, 0.36f, textZ));
             SetLocalText(bodyLabel, new Vector3(0f, 0.02f, textZ));

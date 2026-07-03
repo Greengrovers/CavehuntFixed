@@ -1,11 +1,16 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class PickupLocationArrow : MonoBehaviour
 {
     private const string ObjectName = "Pickup Arrow Icon";
+    private const float VisibilityScaleBoost = 1.45f;
+    private const float VisibilityHeightBoost = 0.45f;
+    private const float PulseAmount = 0.16f;
+    private const float PulseSpeed = 4.5f;
 
     private Transform target;
     private float height = 2.4f;
+    private Vector3 baseScale = Vector3.one;
     private Camera cachedCamera;
 
     public static PickupLocationArrow Attach(Transform pickup, Color color, float height, float scale)
@@ -14,13 +19,14 @@ public class PickupLocationArrow : MonoBehaviour
 
         GameObject arrowObject = new GameObject(ObjectName);
         arrowObject.transform.SetParent(pickup, false);
-        arrowObject.transform.localPosition = Vector3.up * Mathf.Max(0.1f, height);
-        arrowObject.transform.localScale = Vector3.one * Mathf.Max(0.05f, scale);
 
         PickupLocationArrow arrow = arrowObject.AddComponent<PickupLocationArrow>();
         arrow.target = pickup;
-        arrow.height = Mathf.Max(0.1f, height);
-        arrow.BuildArrow(color);
+        arrow.height = Mathf.Max(0.1f, height + VisibilityHeightBoost);
+        arrow.baseScale = Vector3.one * Mathf.Max(0.05f, scale * VisibilityScaleBoost);
+        arrowObject.transform.localPosition = Vector3.up * arrow.height;
+        arrowObject.transform.localScale = arrow.baseScale;
+        arrow.BuildArrow(Brighten(color));
         return arrow;
     }
 
@@ -33,6 +39,8 @@ public class PickupLocationArrow : MonoBehaviour
         }
 
         transform.position = target.position + Vector3.up * height;
+        float pulse = 1f + Mathf.Sin(Time.time * PulseSpeed) * PulseAmount;
+        transform.localScale = baseScale * pulse;
 
         if (cachedCamera == null)
         {
@@ -51,19 +59,21 @@ public class PickupLocationArrow : MonoBehaviour
         MeshRenderer meshRenderer = gameObject.AddComponent<MeshRenderer>();
         meshFilter.sharedMesh = CreateArrowMesh();
         meshRenderer.sharedMaterial = CreateMaterial(color);
+        meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        meshRenderer.receiveShadows = false;
     }
 
     private static Mesh CreateArrowMesh()
     {
         Vector3[] vertices =
         {
-            new Vector3(-0.13f, 0.42f, 0f),
-            new Vector3(0.13f, 0.42f, 0f),
-            new Vector3(0.13f, -0.08f, 0f),
-            new Vector3(0.36f, -0.08f, 0f),
-            new Vector3(0f, -0.48f, 0f),
-            new Vector3(-0.36f, -0.08f, 0f),
-            new Vector3(-0.13f, -0.08f, 0f)
+            new Vector3(-0.18f, 0.48f, 0f),
+            new Vector3(0.18f, 0.48f, 0f),
+            new Vector3(0.18f, -0.08f, 0f),
+            new Vector3(0.43f, -0.08f, 0f),
+            new Vector3(0f, -0.56f, 0f),
+            new Vector3(-0.43f, -0.08f, 0f),
+            new Vector3(-0.18f, -0.08f, 0f)
         };
 
         int[] front =
@@ -116,6 +126,26 @@ public class PickupLocationArrow : MonoBehaviour
         {
             color = color
         };
+
+        if (material.HasProperty("_BaseColor"))
+        {
+            material.SetColor("_BaseColor", color);
+        }
+
+        if (material.HasProperty("_EmissionColor"))
+        {
+            material.EnableKeyword("_EMISSION");
+            material.SetColor("_EmissionColor", color * 0.65f);
+        }
+
         return material;
+    }
+
+    private static Color Brighten(Color color)
+    {
+        Color.RGBToHSV(color, out float hue, out float saturation, out float value);
+        Color brighter = Color.HSVToRGB(hue, Mathf.Clamp01(saturation * 1.1f), Mathf.Clamp01(value * 1.35f));
+        brighter.a = 1f;
+        return brighter;
     }
 }

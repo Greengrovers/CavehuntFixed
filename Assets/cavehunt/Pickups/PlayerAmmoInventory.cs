@@ -126,6 +126,26 @@ public class PlayerAmmoInventory : MonoBehaviour
         Debug.Log($"Picked up {safeAmount} {ammoType} ammo. Current ammo: {CurrentAmmo}");
     }
 
+    public void ResetAmmo()
+    {
+        fireAmmo = 0;
+        grenadeAmmo = 0;
+        airAmmo = 0;
+        currentAmmo = AmmoType.Normal;
+    }
+
+    public static void ResetAllAmmoInventories()
+    {
+        PlayerAmmoInventory[] inventories = FindObjectsByType<PlayerAmmoInventory>(FindObjectsInactive.Include);
+        for (int i = 0; i < inventories.Length; i++)
+        {
+            if (inventories[i] != null)
+            {
+                inventories[i].ResetAmmo();
+            }
+        }
+    }
+
     public bool SelectAmmo(AmmoType ammoType)
     {
         if (!HasAmmo(ammoType)) return false;

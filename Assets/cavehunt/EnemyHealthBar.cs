@@ -19,6 +19,7 @@ public class EnemyHealthBar : MonoBehaviour
     private Material fillMaterial;
     private BatEnemy batEnemy;
     private Transform viewerTarget;
+    private bool forceHidden;
 
     private void Awake()
     {
@@ -30,6 +31,18 @@ public class EnemyHealthBar : MonoBehaviour
     public void Configure(Transform target)
     {
         viewerTarget = target;
+    }
+
+    public void Hide()
+    {
+        forceHidden = true;
+        if (backgroundRenderer != null) backgroundRenderer.enabled = false;
+        if (fillRenderer != null) fillRenderer.enabled = false;
+    }
+
+    public void Show()
+    {
+        forceHidden = false;
     }
 
     private void LateUpdate()
@@ -113,7 +126,7 @@ public class EnemyHealthBar : MonoBehaviour
             ? Mathf.Clamp01(damageable.CurrentHealth / damageable.MaxHealth)
             : 0f;
 
-        bool visible = healthFraction > 0f && (batEnemy == null || batEnemy.IsPresenting);
+        bool visible = !forceHidden && healthFraction > 0f && (batEnemy == null || batEnemy.IsPresenting);
         if (backgroundRenderer != null) backgroundRenderer.enabled = visible;
         if (fillRenderer != null) fillRenderer.enabled = visible;
 

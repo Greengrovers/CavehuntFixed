@@ -25,6 +25,7 @@ public class EnemyPickupDropper : MonoBehaviour
     [SerializeField] private float pickupArrowScale = 0.9f;
 
     [Header("Trap")]
+    [SerializeField] private bool spawnTraps = false;
     [SerializeField, Range(0f, 1f)] private float trapSpawnChance = 0.25f;
     [SerializeField] private GameObject spikeTrapTemplate;
     [SerializeField] private string spikeTrapSceneObjectName = "Trap";
@@ -117,6 +118,7 @@ public class EnemyPickupDropper : MonoBehaviour
         }
 
         AttachPickupArrow(pickup);
+        ProceduralGameAudio.PlayPickupDrop(spawnPosition);
         TrySpawnTrapBetweenPlayerAndPickup(spawnPosition);
         TrySpawnHealingGeodeBetweenPlayerAndPickup(spawnPosition);
 
@@ -374,6 +376,7 @@ public class EnemyPickupDropper : MonoBehaviour
 
     private void TrySpawnTrapBetweenPlayerAndPickup(Vector3 pickupPosition)
     {
+        if (!spawnTraps) return;
         if (trapSpawnChance <= 0f || Random.value > trapSpawnChance) return;
 
         Transform playerTarget = ResolvePlayerTarget();

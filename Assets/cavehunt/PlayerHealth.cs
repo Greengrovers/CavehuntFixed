@@ -80,6 +80,7 @@ public class PlayerHealth : MonoBehaviour
 
             if (autoCreateGameOverMenu)
             {
+                PlayerAmmoInventory.ResetAllAmmoInventories();
                 CavehuntRuntimeCleanup.DestroyGameplayLeftovers();
                 ClearDamageFlash();
                 BowStartExperience.HideAllBowsForPlayerDeath();
@@ -143,6 +144,7 @@ public class PlayerHealth : MonoBehaviour
     public void RetryFromGameOver()
     {
         CavehuntScoreSystem.ResetScore();
+        PlayerAmmoInventory.ResetAllAmmoInventories();
         ResetToFullHealth();
     }
 

@@ -75,6 +75,7 @@ public class ArrowAmmoVfx : MonoBehaviour
         Color coreColor;
         Color edgeColor;
         ResolveColors(impactAmmoType, out coreColor, out edgeColor);
+        float impactScale = impactAmmoType == AmmoType.Grenade ? 1f : 1.3f;
 
         GameObject impactObject = new GameObject($"{impactAmmoType} Arrow Impact VFX");
         impactObject.transform.position = position;
@@ -84,8 +85,8 @@ public class ArrowAmmoVfx : MonoBehaviour
             burst,
             coreColor,
             edgeColor,
-            impactAmmoType == AmmoType.Grenade ? 0.18f : impactAmmoType == AmmoType.Normal ? 0.045f : 0.08f,
-            impactAmmoType == AmmoType.Grenade ? 7.5f : impactAmmoType == AmmoType.Normal ? 1.6f : 3.2f,
+            (impactAmmoType == AmmoType.Grenade ? 0.18f : impactAmmoType == AmmoType.Normal ? 0.045f : 0.08f) * impactScale,
+            (impactAmmoType == AmmoType.Grenade ? 7.5f : impactAmmoType == AmmoType.Normal ? 1.6f : 3.2f) * impactScale,
             false,
             ParticleSystemSimulationSpace.World,
             ParticleSystemShapeType.Sphere,
@@ -103,15 +104,15 @@ public class ArrowAmmoVfx : MonoBehaviour
         }
         else if (impactAmmoType == AmmoType.Air)
         {
-            CreateShockwave(impactObject.transform, 1.35f, airCoreColor, 0.35f);
+            CreateShockwave(impactObject.transform, 1.35f * impactScale, airCoreColor, 0.35f);
         }
         else if (impactAmmoType == AmmoType.Fire)
         {
-            CreateShockwave(impactObject.transform, 0.85f, fireCoreColor, 0.25f);
+            CreateShockwave(impactObject.transform, 0.85f * impactScale, fireCoreColor, 0.25f);
         }
         else if (impactAmmoType == AmmoType.Normal)
         {
-            CreateShockwave(impactObject.transform, 0.45f, normalCoreColor, 0.18f);
+            CreateShockwave(impactObject.transform, 0.45f * impactScale, normalCoreColor, 0.18f);
         }
 
         Destroy(impactObject, impactAmmoType == AmmoType.Grenade ? 3.5f : impactAmmoType == AmmoType.Normal ? 0.9f : 1.6f);
